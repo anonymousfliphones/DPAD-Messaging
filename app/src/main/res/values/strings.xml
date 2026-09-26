@@ -211,6 +211,12 @@
     <string name="attachment_permission_needed">Storage permission is required to attach files.</string>
     <string name="audio_playback_unavailable">No app can play this audio attachment.</string>
     <string name="attachment_open_unavailable">No app can open this attachment.</string>
+    <string name="save_attachments">Save attachments</string>
+    <string name="share_attachment">Share attachment</string>
+    <string name="open_attachment">Open attachment</string>
+    <string name="attachments_saved_count">Saved %1$d attachment(s).</string>
+    <string name="attachments_save_failed">Could not save the attachments.</string>
+    <string name="attachment_share_unavailable">Could not share this attachment.</string>
 
     <!-- Schedule picker labels -->
     <string name="schedule_year">Year</string>

@@ -96,7 +96,7 @@ jobs:
       RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
       RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-      EXPERIMENTAL_VERSION_CODE: ${{ 100000 + github.run_number }}
+      EXPERIMENTAL_VERSION_CODE: ${{ 1046000 + github.run_number }}
 
     steps:
       - name: Checkout

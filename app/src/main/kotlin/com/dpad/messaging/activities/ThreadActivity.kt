@@ -47,6 +47,8 @@ import com.dpad.messaging.extensions.markThreadAsReadInTelephony
 import com.dpad.messaging.helpers.AttachmentPolicy
 import com.dpad.messaging.helpers.MessageCache
 import com.dpad.messaging.helpers.MessageSenders
+import com.dpad.messaging.helpers.MmsAttachmentSaver
+import com.dpad.messaging.helpers.MmsAttachmentShare
 import com.dpad.messaging.helpers.NotificationHelper
 import com.dpad.messaging.helpers.Prefs
 import com.dpad.messaging.helpers.ScheduledMessageScheduler
@@ -55,6 +57,8 @@ import com.dpad.messaging.helpers.SendingRouter
 import com.dpad.messaging.helpers.ThemeManager
 import com.dpad.messaging.helpers.SmsWhitelistManager
 import com.dpad.messaging.models.Message
+import com.dpad.messaging.models.MmsAttachment
+import com.dpad.messaging.models.MmsAttachmentJson
 import com.dpad.messaging.models.RecycleBinMessage
 import com.dpad.messaging.models.ThreadItem
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +80,8 @@ class ThreadActivity : BaseActivity() {
     private enum class PendingPermissionAction {
         ATTACHMENT_PICKER,
         SPEECH_INPUT,
-        VOICE_RECORDING
+        VOICE_RECORDING,
+        SAVE_MMS_ATTACHMENTS
     }
 
     private lateinit var binding: ActivityThreadBinding
@@ -103,6 +108,7 @@ class ThreadActivity : BaseActivity() {
     private var pendingVoiceAttachmentFile: File? = null
     private var pendingCameraUri: Uri? = null
     private var pendingScheduledAtMillis: Long? = null
+    private var pendingMmsSaveAttachments: List<MmsAttachment> = emptyList()
     private var pendingPermissionAction: PendingPermissionAction? = null
     private var isRecordingVoiceMessage = false
     private var recorder: MediaRecorder? = null
@@ -143,6 +149,7 @@ class ThreadActivity : BaseActivity() {
                     PendingPermissionAction.ATTACHMENT_PICKER -> launchAttachmentPickerChooser()
                     PendingPermissionAction.SPEECH_INPUT -> launchSpeechInput()
                     PendingPermissionAction.VOICE_RECORDING -> toggleVoiceRecording()
+                    PendingPermissionAction.SAVE_MMS_ATTACHMENTS -> saveMmsAttachmentsNow(pendingMmsSaveAttachments)
                     null -> Unit
                 }
             } else {
@@ -150,6 +157,7 @@ class ThreadActivity : BaseActivity() {
                     PendingPermissionAction.ATTACHMENT_PICKER -> R.string.attachment_permission_needed
                     PendingPermissionAction.SPEECH_INPUT,
                     PendingPermissionAction.VOICE_RECORDING,
+                    PendingPermissionAction.SAVE_MMS_ATTACHMENTS,
                     null -> R.string.permission_denied
                 }
                 android.widget.Toast.makeText(this, messageRes, android.widget.Toast.LENGTH_SHORT).show()
@@ -652,6 +660,7 @@ class ThreadActivity : BaseActivity() {
                 PendingPermissionAction.ATTACHMENT_PICKER -> launchAttachmentPickerChooser()
                 PendingPermissionAction.SPEECH_INPUT -> launchSpeechInput()
                 PendingPermissionAction.VOICE_RECORDING -> toggleVoiceRecording()
+                PendingPermissionAction.SAVE_MMS_ATTACHMENTS -> saveMmsAttachmentsNow(pendingMmsSaveAttachments)
             }
             pendingPermissionAction = null
             return
@@ -1651,8 +1660,18 @@ class ThreadActivity : BaseActivity() {
     // ─── Context menus ──────────────────────────────────────────────────────
 
     private fun showMessageContextMenu(message: Message) {
+        val attachments = if (message.isMms) {
+            MmsAttachmentJson.decode(message.attachmentsJson)
+        } else {
+            emptyList()
+        }
         val options = buildList {
             add(getString(R.string.copy_text))
+            if (attachments.isNotEmpty()) {
+                add(getString(R.string.save_attachments))
+                add(getString(R.string.share_attachment))
+                add(getString(R.string.open_attachment))
+            }
             if (!message.isIncoming) {
                 if (message.isScheduled && message.type == Message.TYPE_QUEUED) {
                     add(getString(R.string.cancel_scheduled_message))
@@ -1667,6 +1686,9 @@ class ThreadActivity : BaseActivity() {
             .setItems(options) { _, which ->
                 when (options[which]) {
                     getString(R.string.copy_text) -> copyMessageText(message.body)
+                    getString(R.string.save_attachments) -> saveMmsAttachments(attachments)
+                    getString(R.string.share_attachment) -> chooseAttachment(attachments, ::shareAttachment)
+                    getString(R.string.open_attachment) -> chooseAttachment(attachments, ::openAttachment)
                     getString(R.string.cancel_scheduled_message) -> cancelScheduledMessage(message)
                     getString(R.string.retry_send) -> retryMessage(message)
                     getString(R.string.forward) -> forwardMessage(message)
@@ -1675,6 +1697,94 @@ class ThreadActivity : BaseActivity() {
             }
             .create()
             .show()
+    }
+
+    private fun chooseAttachment(
+        attachments: List<MmsAttachment>,
+        action: (MmsAttachment) -> Unit
+    ) {
+        if (attachments.isEmpty()) return
+        if (attachments.size == 1) {
+            action(attachments.single())
+            return
+        }
+        val labels = attachments.mapIndexed { index, attachment ->
+            attachment.fileName.ifBlank { "${attachment.mimeType} #${index + 1}" }
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.choose_attachment_app)
+            .setItems(labels) { _, which -> action(attachments[which]) }
+            .show()
+    }
+
+    private fun saveMmsAttachments(attachments: List<MmsAttachment>) {
+        if (attachments.isEmpty()) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingMmsSaveAttachments = attachments
+            requestPermissionsForAction(
+                PendingPermissionAction.SAVE_MMS_ATTACHMENTS,
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            )
+            return
+        }
+        saveMmsAttachmentsNow(attachments)
+    }
+
+    private fun saveMmsAttachmentsNow(attachments: List<MmsAttachment>) {
+        pendingMmsSaveAttachments = emptyList()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val saved = attachments.count { MmsAttachmentSaver.save(this@ThreadActivity, it) }
+            withContext(Dispatchers.Main) {
+                if (saved > 0) {
+                    android.widget.Toast.makeText(
+                        this@ThreadActivity,
+                        getString(R.string.attachments_saved_count, saved),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    android.widget.Toast.makeText(
+                        this@ThreadActivity,
+                        R.string.attachments_save_failed,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun shareAttachment(attachment: MmsAttachment) {
+        val uri = MmsAttachmentShare.createUri(this, attachment)
+        if (uri == null) {
+            android.widget.Toast.makeText(this, R.string.attachment_share_unavailable, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = attachment.mimeType.ifBlank { "*/*" }
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = ClipData.newRawUri(attachment.fileName, uri)
+        }
+        startActivity(Intent.createChooser(intent, getString(R.string.choose_attachment_app)))
+    }
+
+    private fun openAttachment(attachment: MmsAttachment) {
+        val uri = MmsAttachmentShare.createUri(this, attachment)
+        if (uri == null) {
+            android.widget.Toast.makeText(this, R.string.attachment_open_unavailable, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, attachment.mimeType.ifBlank { "*/*" })
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            android.widget.Toast.makeText(this, R.string.attachment_open_unavailable, android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun copyMessageText(body: String) {

@@ -5,7 +5,6 @@ import android.content.Intent
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +21,7 @@ import com.dpad.messaging.databinding.ItemMessageSentBinding
 import com.dpad.messaging.databinding.ItemThreadDateBinding
 import com.dpad.messaging.helpers.AttachmentPolicy
 import com.dpad.messaging.helpers.ContactColors
+import com.dpad.messaging.helpers.MmsAttachmentShare
 import com.dpad.messaging.helpers.Prefs
 import com.dpad.messaging.models.MmsAttachment
 import com.dpad.messaging.models.MmsAttachmentJson
@@ -264,13 +264,18 @@ class ThreadAdapter(
         context.startActivity(intent)
     }
 
-    private fun openAttachment(context: android.content.Context, uriString: String, mimeType: String) {
-        val uri = Uri.parse(uriString)
+    private fun openAttachment(context: android.content.Context, attachment: MmsAttachment) {
+        val uri = MmsAttachmentShare.createUri(context, attachment)
+        if (uri == null) {
+            Toast.makeText(context, R.string.attachment_open_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val mimeType = attachment.mimeType
         val type = when {
             mimeType.isNotBlank() -> mimeType
-            uriString.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
-            uriString.endsWith(".mp3", ignoreCase = true) -> "audio/mpeg"
-            uriString.endsWith(".wav", ignoreCase = true) -> "audio/wav"
+            attachment.fileName.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
+            attachment.fileName.endsWith(".mp3", ignoreCase = true) -> "audio/mpeg"
+            attachment.fileName.endsWith(".wav", ignoreCase = true) -> "audio/wav"
             else -> "*/*"
         }
 
@@ -343,10 +348,28 @@ class ThreadAdapter(
             val iv = holder.itemView as android.widget.ImageView
             iv.apply {
                 scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                Glide.with(context).load(attachment.contentUri)
-                    .override(120, 120)
-                    .into(this)
-                setOnClickListener { openImageViewer(context, attachment) }
+                Glide.with(context).clear(this)
+                if (attachment.mimeType.startsWith("image/") || attachment.mimeType.isBlank()) {
+                    Glide.with(context).load(attachment.contentUri)
+                        .override(120, 120)
+                        .into(this)
+                } else {
+                    setImageResource(
+                        if (attachment.mimeType.startsWith("audio/")) {
+                            R.drawable.ic_mic
+                        } else {
+                            R.drawable.ic_attach
+                        }
+                    )
+                    scaleType = android.widget.ImageView.ScaleType.CENTER
+                }
+                setOnClickListener {
+                    if (attachment.mimeType.startsWith("image/") || attachment.mimeType.isBlank()) {
+                        openImageViewer(context, attachment)
+                    } else {
+                        openAttachment(context, attachment)
+                    }
+                }
             }
         }
 
