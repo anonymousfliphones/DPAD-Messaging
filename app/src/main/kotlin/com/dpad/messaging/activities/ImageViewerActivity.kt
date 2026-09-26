@@ -1,15 +1,12 @@
 package com.dpad.messaging.activities
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
@@ -28,17 +25,15 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.dpad.messaging.helpers.MmsAttachmentSaver
+import com.dpad.messaging.models.MmsAttachment
 
 class ImageViewerActivity : BaseActivity() {
     private lateinit var imageView: ImageView
     private lateinit var zoomLabel: TextView
     private lateinit var saveButton: View
     private lateinit var imageUri: Uri
+    private lateinit var attachment: MmsAttachment
 
     private val matrixValues = Matrix()
     private var scaleFactor = 1f
@@ -64,6 +59,11 @@ class ImageViewerActivity : BaseActivity() {
             return
         }
         imageUri = Uri.parse(uriString)
+        attachment = MmsAttachment(
+            uri = uriString,
+            mimeType = intent.getStringExtra(EXTRA_MIME_TYPE).orEmpty(),
+            fileName = intent.getStringExtra(EXTRA_FILE_NAME).orEmpty()
+        )
 
         Glide.with(this)
             .load(imageUri)
@@ -272,69 +272,7 @@ class ImageViewerActivity : BaseActivity() {
     }
 
     private fun copyImageToGallery(): Boolean {
-        val mimeType = contentResolver.getType(imageUri)?.takeIf { it.startsWith("image/") }
-            ?: "image/jpeg"
-        val extension = when (mimeType) {
-            "image/png" -> "png"
-            "image/webp" -> "webp"
-            "image/gif" -> "gif"
-            else -> "jpg"
-        }
-        val displayName = "DPAD_SMS_" +
-            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + "." + extension
-
-        return runCatching {
-            contentResolver.openInputStream(imageUri)?.use { input ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val values = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
-                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                        put(
-                            MediaStore.Images.Media.RELATIVE_PATH,
-                            Environment.DIRECTORY_PICTURES + "/DPAD Messaging"
-                        )
-                        put(MediaStore.Images.Media.IS_PENDING, 1)
-                    }
-                    val outputUri = contentResolver.insert(
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        values
-                    ) ?: return@runCatching false
-
-                    try {
-                        contentResolver.openOutputStream(outputUri)?.use { output ->
-                            input.copyTo(output)
-                        } ?: throw IllegalStateException("Unable to open gallery output")
-                        values.clear()
-                        values.put(MediaStore.Images.Media.IS_PENDING, 0)
-                        contentResolver.update(outputUri, values, null, null)
-                        true
-                    } catch (error: Exception) {
-                        contentResolver.delete(outputUri, null, null)
-                        throw error
-                    }
-                } else {
-                    val directory = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                        "DPAD Messaging"
-                    )
-                    if (!directory.exists() && !directory.mkdirs()) {
-                        throw IllegalStateException("Unable to create gallery directory")
-                    }
-                    val outputFile = File(directory, displayName)
-                    FileOutputStream(outputFile).use { output -> input.copyTo(output) }
-                    android.media.MediaScannerConnection.scanFile(
-                        this,
-                        arrayOf(outputFile.absolutePath),
-                        arrayOf(mimeType),
-                        null
-                    )
-                    true
-                }
-            } ?: false
-        }.getOrElse { error ->
-            if (BuildConfig.DEBUG) Log.e(TAG, "Unable to save image to gallery", error)
-            false
-        }
+        return MmsAttachmentSaver.save(this, attachment)
     }
 
     private fun showToast(messageResId: Int) {
@@ -343,6 +281,8 @@ class ImageViewerActivity : BaseActivity() {
 
     companion object {
         const val EXTRA_IMAGE_URI = "extra_image_uri"
+        const val EXTRA_MIME_TYPE = "extra_mime_type"
+        const val EXTRA_FILE_NAME = "extra_file_name"
         private const val REQUEST_WRITE_STORAGE = 1001
         private const val TAG = "ImageViewer"
     }

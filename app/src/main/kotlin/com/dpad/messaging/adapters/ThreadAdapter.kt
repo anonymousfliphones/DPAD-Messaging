@@ -23,9 +23,10 @@ import com.dpad.messaging.databinding.ItemThreadDateBinding
 import com.dpad.messaging.helpers.AttachmentPolicy
 import com.dpad.messaging.helpers.ContactColors
 import com.dpad.messaging.helpers.Prefs
+import com.dpad.messaging.models.MmsAttachment
+import com.dpad.messaging.models.MmsAttachmentJson
 import com.dpad.messaging.models.Message
 import com.dpad.messaging.models.ThreadItem
-import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -255,9 +256,11 @@ class ThreadAdapter(
         }
     }
 
-    private fun openImageViewer(context: android.content.Context, attachmentUri: String) {
+    private fun openImageViewer(context: android.content.Context, attachment: MmsAttachment) {
         val intent = Intent(context, ImageViewerActivity::class.java)
-            .putExtra(ImageViewerActivity.EXTRA_IMAGE_URI, attachmentUri)
+            .putExtra(ImageViewerActivity.EXTRA_IMAGE_URI, attachment.uri)
+            .putExtra(ImageViewerActivity.EXTRA_MIME_TYPE, attachment.mimeType)
+            .putExtra(ImageViewerActivity.EXTRA_FILE_NAME, attachment.fileName)
         context.startActivity(intent)
     }
 
@@ -300,8 +303,9 @@ class ThreadAdapter(
             return
         }
 
-        val attachmentUris = extractAttachmentUris(message.attachmentsJson)
-        if (attachmentUris.isEmpty()) {
+        val attachments = MmsAttachmentJson.decode(message.attachmentsJson)
+            .filter { it.mimeType.startsWith("image/") || it.mimeType.isBlank() }
+        if (attachments.isEmpty()) {
             bubbleContainer.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_attachments).apply {
                 visibility = View.GONE
                 adapter = null
@@ -312,27 +316,12 @@ class ThreadAdapter(
         val context = bubbleContainer.context
         val rvAttachments = bubbleContainer.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_attachments)
         rvAttachments.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(context, androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL, false)
-        rvAttachments.adapter = AttachmentAdapter(attachmentUris, context)
+        rvAttachments.adapter = AttachmentAdapter(attachments, context)
         rvAttachments.visibility = View.VISIBLE
     }
 
-    private fun extractAttachmentUris(raw: String): List<String> {
-        val value = raw.trim()
-        if (value.isBlank() || value == "[]") return emptyList()
-        if (!value.startsWith("[")) return listOf(value)
-        return runCatching {
-            val array = JSONArray(value)
-            val list = mutableListOf<String>()
-            for (index in 0 until array.length()) {
-                val candidate = array.optString(index).trim()
-                if (candidate.isNotBlank()) list.add(candidate)
-            }
-            list
-        }.getOrDefault(emptyList())
-    }
-
     private inner class AttachmentAdapter(
-        private val uris: List<String>,
+        private val attachments: List<MmsAttachment>,
         private val context: Context
     ) : androidx.recyclerview.widget.RecyclerView.Adapter<AttachmentAdapter.ViewHolder>() {
 
@@ -350,18 +339,18 @@ class ThreadAdapter(
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val uri = uris[position]
+            val attachment = attachments[position]
             val iv = holder.itemView as android.widget.ImageView
             iv.apply {
                 scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
-                Glide.with(context).load(android.net.Uri.parse(uri))
+                Glide.with(context).load(attachment.contentUri)
                     .override(120, 120)
                     .into(this)
-                setOnClickListener { openImageViewer(context, uri) }
+                setOnClickListener { openImageViewer(context, attachment) }
             }
         }
 
-        override fun getItemCount() = uris.size
+        override fun getItemCount() = attachments.size
 
         inner class ViewHolder(view: android.view.View) : androidx.recyclerview.widget.RecyclerView.ViewHolder(view)
     }

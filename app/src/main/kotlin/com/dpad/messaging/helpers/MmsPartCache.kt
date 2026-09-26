@@ -1,6 +1,7 @@
 package com.dpad.messaging.helpers
 
 import android.util.LruCache
+import com.dpad.messaging.models.MmsAttachment
 
 /**
  * Tiny in-memory cache for MMS part lookups.
@@ -12,9 +13,15 @@ object MmsPartCache {
 
     data class CachedParts(
         val textBody: String,
-        val imagePartUris: List<String>,
+        val attachments: List<MmsAttachment>
+    ) {
+        val imagePartUris: List<String>
+            get() = attachments.filter { it.mimeType.startsWith("image/") }.map { it.uri }
+
         val attachmentLabel: String
-    )
+            get() = attachments.firstOrNull { !it.mimeType.startsWith("image/") }
+                ?.mimeType.orEmpty()
+    }
 
     private val cache = LruCache<Long, CachedParts>(256)
 

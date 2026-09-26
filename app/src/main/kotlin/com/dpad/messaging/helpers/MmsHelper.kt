@@ -4,9 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.dpad.messaging.BuildConfig
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.nio.charset.StandardCharsets
+import com.dpad.messaging.models.MmsAttachment
 
 /**
  * Utilities for reading MMS message parts from the system Telephony provider.
@@ -16,24 +14,6 @@ import java.nio.charset.StandardCharsets
 object MmsHelper {
 
     private const val TAG = "DPAD_MSG"
-
-    private val IMAGE_MIME_TYPES = setOf(
-        "image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"
-    )
-
-    // MIME types to skip when looking for "other attachment" labels
-    private val SKIP_MIME_TYPES = IMAGE_MIME_TYPES + setOf("text/plain", "application/smil")
-    private fun String?.isImageMimeType(): Boolean {
-        val mimeType = this?.lowercase() ?: return false
-        return mimeType.startsWith("image/") || mimeType in IMAGE_MIME_TYPES
-    }
-
-    private fun String?.isVcardMimeType(): Boolean {
-        val mimeType = this?.lowercase()?.substringBefore(';')?.trim() ?: return false
-        return mimeType == "text/x-vcard" ||
-            mimeType == "text/vcard" ||
-            mimeType == "text/directory"
-    }
 
     /**
      * Returns the text/plain body of an MMS message, or an empty string if none.
@@ -48,6 +28,10 @@ object MmsHelper {
      */
     fun getMmsImagePartUris(context: Context, msgId: Long): List<String> {
         return getCachedParts(context, msgId).imagePartUris
+    }
+
+    fun getMmsAttachments(context: Context, msgId: Long): List<MmsAttachment> {
+        return getCachedParts(context, msgId).attachments
     }
 
     /**
@@ -86,26 +70,39 @@ object MmsHelper {
         }
 
         var textBody = ""
-        var imagePartUris = mutableListOf<String>()
-        var attachmentLabel = ""
+        val attachments = mutableListOf<MmsAttachment>()
         var rowCount = 0
+        var querySucceeded = false
 
         val partsUri = Uri.parse("content://mms/$msgId/part")
         try {
             context.contentResolver.query(
                 partsUri,
-                arrayOf("_id", "ct", "text"),
+                arrayOf("_id", "ct", "text", "cl", "name"),
                 null,
                 null,
                 null
             )?.use { cursor ->
+                querySucceeded = true
                 val idxId = cursor.getColumnIndex("_id")
                 val idxCt = cursor.getColumnIndex("ct")
                 val idxText = cursor.getColumnIndex("text")
+                val idxContentLocation = cursor.getColumnIndex("cl")
+                val idxName = cursor.getColumnIndex("name")
+
+                if (idxId < 0 || idxCt < 0) {
+                    Log.w(TAG, "getCachedParts($msgId) missing required part columns")
+                    querySucceeded = false
+                    return@use
+                }
 
                 while (cursor.moveToNext()) {
                     rowCount++
-                    val rawCt = cursor.getString(idxCt) ?: continue
+                    val rawCt = cursor.getString(idxCt)
+                    if (rawCt.isNullOrBlank()) {
+                        Log.w(TAG, "getCachedParts($msgId) part has no content type")
+                        continue
+                    }
                     val ct = rawCt.substringBefore(';').trim().lowercase()
 
                     if (ct == "text/plain") {
@@ -116,22 +113,21 @@ object MmsHelper {
                         }
                     }
 
-                    if (ct.isImageMimeType()) {
+                    if (ct != "text/plain" && ct != "application/smil") {
                         val partId = cursor.getLong(idxId)
-                        imagePartUris.add("content://mms/part/$partId")
-                    }
-
-                    if (attachmentLabel.isBlank() && !ct.isImageMimeType() && ct !in SKIP_MIME_TYPES) {
-                        attachmentLabel = if (ct.isVcardMimeType() && idxId >= 0) {
-                            val partId = cursor.getLong(idxId)
-                            readVcardLabel(context, partId)
+                        val contentLocation = if (idxContentLocation >= 0) {
+                            cursor.getString(idxContentLocation).orEmpty()
                         } else {
-                            ct
+                            ""
                         }
-                    }
-
-                    if (textBody.isNotBlank() && imagePartUris.isNotEmpty() && attachmentLabel.isNotBlank()) {
-                        break
+                        val name = if (idxName >= 0) cursor.getString(idxName).orEmpty() else ""
+                        attachments.add(
+                            MmsAttachment(
+                                uri = "content://mms/part/$partId",
+                                mimeType = ct,
+                                fileName = bestFileName(name, contentLocation, ct)
+                            )
+                        )
                     }
                 }
             }
@@ -143,67 +139,25 @@ object MmsHelper {
             Log.d(
                 TAG,
                 "getCachedParts($msgId) rows=$rowCount bodyLen=${textBody.length} " +
-                    "imgs=${imagePartUris.size} label=$attachmentLabel"
+                    "attachments=${attachments.size}"
             )
         }
 
         return MmsPartCache.CachedParts(
             textBody = textBody,
-            imagePartUris = imagePartUris,
-            attachmentLabel = attachmentLabel
-        ).also { MmsPartCache.put(msgId, it) }
+            attachments = attachments
+        ).also { if (querySucceeded) MmsPartCache.put(msgId, it) }
     }
 
-    private fun readVcardLabel(context: Context, partId: Long): String {
-        val uri = Uri.parse("content://mms/part/$partId")
-        val raw = try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                BufferedReader(InputStreamReader(input, StandardCharsets.UTF_8)).readText()
-            }
-        } catch (_: Exception) {
-            null
+    private fun bestFileName(name: String, contentLocation: String, mimeType: String): String {
+        val candidate = name.ifBlank { contentLocation.substringAfterLast('/').substringBefore('?') }
+        if (candidate.isNotBlank() && candidate != ".") return candidate
+        return when {
+            mimeType.startsWith("image/") -> "image"
+            mimeType.startsWith("audio/") -> "audio"
+            mimeType.startsWith("video/") -> "video"
+            else -> "attachment"
         }
-
-        val name = raw?.let { extractVcardName(it) }
-        return if (!name.isNullOrBlank()) "Contact: $name" else "Contact card"
     }
 
-    private fun extractVcardName(raw: String): String? {
-        val unfolded = raw.replace(Regex("\\r?\\n[ \\t]"), "")
-
-        for (line in unfolded.lineSequence()) {
-            val trimmed = line.trim()
-            if (trimmed.startsWith("FN", ignoreCase = true)) {
-                val value = trimmed.substringAfter(':', "").trim()
-                if (value.isNotBlank()) return unescapeVcardValue(value)
-            }
-        }
-
-        for (line in unfolded.lineSequence()) {
-            val trimmed = line.trim()
-            if (trimmed.startsWith("N", ignoreCase = true)) {
-                val value = trimmed.substringAfter(':', "").trim()
-                if (value.isBlank()) continue
-                val parts = value.split(';').map { unescapeVcardValue(it.trim()) }
-                val joined = listOfNotNull(
-                    parts.getOrNull(1)?.takeIf { it.isNotBlank() },
-                    parts.getOrNull(2)?.takeIf { it.isNotBlank() },
-                    parts.getOrNull(0)?.takeIf { it.isNotBlank() }
-                ).joinToString(" ").trim()
-                if (joined.isNotBlank()) return joined
-            }
-        }
-
-        return null
-    }
-
-    private fun unescapeVcardValue(value: String): String {
-        return value
-            .replace("\\\\n", "\n")
-            .replace("\\\\N", "\n")
-            .replace("\\\\,", ",")
-            .replace("\\\\;", ";")
-            .replace("\\\\\\\\", "\\")
-            .trim()
-    }
 }
