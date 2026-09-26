@@ -13,9 +13,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object UpdateManager {
-    private const val API_URL =
+    private const val RELEASES_API_URL =
         "https://api.github.com/repos/jbriones95/DPAD-Messaging/releases/latest"
+    private const val EXPERIMENTAL_API_URL =
+        "https://api.github.com/repos/jbriones95/DPAD-Messaging/releases/tags/experimental"
     private const val RELEASE_ASSET_NAME = "app-release.apk"
+    private const val EXPERIMENTAL_ASSET_PREFIX = "app-experimental-"
     private const val RELEASE_ASSET_PREFIX =
         "https://github.com/jbriones95/DPAD-Messaging/releases/download/"
 
@@ -46,18 +49,28 @@ object UpdateManager {
 
     suspend fun check(context: Context): Result {
         return try {
-            val release = fetchRelease()
-            val versionName = release.tagName.removePrefix("v")
-            if (!isNewer(versionName, BuildConfig.VERSION_NAME)) {
-                return Result.UpToDate
+            val experimental = BuildConfig.UPDATE_CHANNEL == "experimental"
+            val release = fetchRelease(experimental)
+            val asset = if (experimental) {
+                release.assets
+                    .filter { it.name.startsWith(EXPERIMENTAL_ASSET_PREFIX) && it.name.endsWith(".apk") }
+                    .maxByOrNull { experimentalVersionCode(it.name) }
+            } else {
+                release.assets.firstOrNull { it.name == RELEASE_ASSET_NAME }
             }
-
-            val asset = release.assets.firstOrNull { it.name == RELEASE_ASSET_NAME }
                 ?: return Result.Error("The release APK was not found")
             if (!asset.downloadUrl.startsWith(RELEASE_ASSET_PREFIX)) {
                 return Result.Error("The release APK URL is not trusted")
             }
 
+            if (!experimental) {
+                val versionName = release.tagName.removePrefix("v")
+                if (!isNewer(versionName, BuildConfig.VERSION_NAME)) return Result.UpToDate
+            } else if (experimentalVersionCode(asset.name) <= BuildConfig.VERSION_CODE) {
+                return Result.UpToDate
+            }
+
+            val versionName = release.tagName.removePrefix("v")
             val apk = downloadApk(context, asset.downloadUrl, versionName)
             validateApk(context, apk)
             Result.Available(versionName, release.body.orEmpty(), apk)
@@ -66,8 +79,9 @@ object UpdateManager {
         }
     }
 
-    private fun fetchRelease(): Release {
-        val connection = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+    private fun fetchRelease(experimental: Boolean): Release {
+        val apiUrl = if (experimental) EXPERIMENTAL_API_URL else RELEASES_API_URL
+        val connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 15_000
             requestMethod = "GET"
@@ -80,6 +94,11 @@ object UpdateManager {
             }
             json.decodeFromString<Release>(input.inputStream.bufferedReader().readText())
         }
+    }
+
+    private fun experimentalVersionCode(assetName: String): Long {
+        return Regex("^${EXPERIMENTAL_ASSET_PREFIX}(\\d+)\\.apk$")
+            .matchEntire(assetName)?.groupValues?.get(1)?.toLongOrNull() ?: -1L
     }
 
     private fun downloadApk(context: Context, url: String, versionName: String): File {

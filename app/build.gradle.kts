@@ -20,8 +20,9 @@ android {
         applicationId = "com.dpadsms"
         minSdk = 23
         targetSdk = 34
-        versionCode = 45
+        versionCode = getSecret("EXPERIMENTAL_VERSION_CODE")?.toIntOrNull() ?: 45
         versionName = "0.4.5"
+        buildConfigField("String", "UPDATE_CHANNEL", "\"production\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -64,10 +65,18 @@ android {
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
+            buildConfigField("String", "UPDATE_CHANNEL", "\"production\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("experimental") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("release")
+            matchingFallbacks += listOf("release")
+            versionNameSuffix = "-experimental"
+            buildConfigField("String", "UPDATE_CHANNEL", "\"experimental\"")
         }
         debug {
             isDebuggable = true

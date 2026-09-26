@@ -42,11 +42,22 @@ Grab the signed APK for the latest release from the [Releases page](https://gith
 # Debug build
 ./gradlew assembleDebug
 
-# Release build
+# General release build
 ./gradlew assembleRelease
+
+# Signed experimental build
+EXPERIMENTAL_VERSION_CODE=100001 ./gradlew assembleExperimental
 ```
 
-The APK will be generated at `app/build/outputs/apk/debug/app-debug.apk` or `app/build/outputs/apk/release/app-release.apk`
+The APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`,
+`app/build/outputs/apk/release/app-release.apk`, or
+`app/build/outputs/apk/experimental/app-experimental.apk`.
+
+General releases are published only from explicit `v*` tags. Pushes to `master`
+build a signed experimental prerelease at the GitHub `experimental` tag. Both
+channels use the same application ID and signing key, so an experimental APK
+can update a general installation. Before a general release, its versionCode
+must be higher than the latest experimental versionCode.
 
 ## Project Structure
 
