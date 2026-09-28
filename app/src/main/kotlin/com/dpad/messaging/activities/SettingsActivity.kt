@@ -338,6 +338,14 @@ class SettingsActivity : BaseActivity() {
         // ── Other ─────────────────────────────────────────────────────────────
         sectionHeader(c, getString(R.string.other))
 
+        toggleRow(
+            container = c,
+            label = getString(R.string.experimental_updates),
+            summary = getString(R.string.experimental_updates_summary),
+            getValue = { prefs.experimentalUpdates || BuildConfig.UPDATE_CHANNEL == "experimental" },
+            setValue = { enabled -> prefs.experimentalUpdates = enabled }
+        )
+
         navRow(
             container = c,
             label     = getString(R.string.check_for_updates),

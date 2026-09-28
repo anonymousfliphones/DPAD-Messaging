@@ -217,6 +217,8 @@
     <string name="attachments_saved_count">Saved %1$d attachment(s).</string>
     <string name="attachments_save_failed">Could not save the attachments.</string>
     <string name="attachment_share_unavailable">Could not share this attachment.</string>
+    <string name="experimental_updates">Experimental updates</string>
+    <string name="experimental_updates_summary">Receive early builds before the general release.</string>
 
     <!-- Schedule picker labels -->
     <string name="schedule_year">Year</string>

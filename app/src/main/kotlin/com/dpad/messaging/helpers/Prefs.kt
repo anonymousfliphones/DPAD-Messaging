@@ -35,6 +35,7 @@ class Prefs private constructor(context: Context) {
         private const val KEY_TIME_FORMAT         = "time_format"
         private const val KEY_UI_SCALE            = "ui_scale"
         private const val KEY_DEFAULT_SMS_DISMISSED = "default_sms_dismissed"
+        private const val KEY_EXPERIMENTAL_UPDATES = "experimental_updates"
         private const val KEY_CONTACT_COLOR_PREFIX = "contact_color_"
 
         const val PRIVACY_FULL        = "full"
@@ -138,6 +139,11 @@ class Prefs private constructor(context: Context) {
     var timeFormat: String
         get() = prefs.getString(KEY_TIME_FORMAT, TIME_FORMAT_12H) ?: TIME_FORMAT_12H
         set(v) = prefs.edit().putString(KEY_TIME_FORMAT, v).apply()
+
+    /** Check the GitHub experimental release feed instead of stable releases. Default: false. */
+    var experimentalUpdates: Boolean
+        get() = prefs.getBoolean(KEY_EXPERIMENTAL_UPDATES, false)
+        set(v) = prefs.edit().putBoolean(KEY_EXPERIMENTAL_UPDATES, v).apply()
 
     /** Returns true when notifications are muted for [threadId]. */
     fun isThreadMuted(threadId: Long): Boolean {

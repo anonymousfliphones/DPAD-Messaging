@@ -46,7 +46,7 @@ Grab the signed APK for the latest release from the [Releases page](https://gith
 ./gradlew assembleRelease
 
 # Signed experimental build
-EXPERIMENTAL_VERSION_CODE=1046001 ./gradlew assembleExperimental
+EXPERIMENTAL_VERSION_CODE=1047001 ./gradlew assembleExperimental
 ```
 
 The APK will be generated at `app/build/outputs/apk/debug/app-debug.apk`,

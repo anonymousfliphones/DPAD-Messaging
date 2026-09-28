@@ -49,7 +49,8 @@ object UpdateManager {
 
     suspend fun check(context: Context): Result {
         return try {
-            val experimental = BuildConfig.UPDATE_CHANNEL == "experimental"
+            val experimental = BuildConfig.UPDATE_CHANNEL == "experimental" ||
+                (BuildConfig.UPDATE_CHANNEL == "production" && Prefs.get().experimentalUpdates)
             val release = fetchRelease(experimental)
             val asset = if (experimental) {
                 release.assets

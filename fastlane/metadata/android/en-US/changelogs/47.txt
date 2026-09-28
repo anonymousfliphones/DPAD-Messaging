@@ -1,0 +1,2 @@
+- Add: Let users opt into experimental updates from Settings
+- Improve: Keep stable users on general releases by default
