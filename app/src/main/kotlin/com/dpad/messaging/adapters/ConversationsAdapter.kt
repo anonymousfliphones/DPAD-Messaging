@@ -85,6 +85,23 @@ class ConversationsAdapter(
             // Date
             binding.tvDate.text = formatDate(conversation.date)
 
+            val unreadDescription = if (!conversation.read && conversation.unreadCount > 0) {
+                binding.root.context.getString(R.string.unread_messages, conversation.unreadCount)
+            } else {
+                binding.root.context.getString(R.string.no_unread_messages)
+            }
+            val stateDescription = buildList {
+                if (conversation.pinned) add(binding.root.context.getString(R.string.pinned_conversation))
+                if (conversation.muted) add(binding.root.context.getString(R.string.muted_conversation))
+            }.joinToString(", ")
+            binding.conversationClickArea.contentDescription = listOf(
+                conversation.title,
+                conversation.snippet.takeIf { it.isNotBlank() },
+                binding.tvDate.text.toString().takeIf { it.isNotBlank() },
+                unreadDescription,
+                stateDescription.takeIf { it.isNotBlank() }
+            ).filterNotNull().joinToString(". ")
+
             // Unread badge
             if (!conversation.read && conversation.unreadCount > 0) {
                 binding.tvUnreadCount.visibility = View.VISIBLE
@@ -106,6 +123,10 @@ class ConversationsAdapter(
             val tint = ColorStateList.valueOf(accent)
             binding.btnConversationMenu.imageTintList = tint
             binding.btnConversationMenu.backgroundTintList = tint
+            binding.btnConversationMenu.contentDescription = binding.root.context.getString(
+                R.string.conversation_options_for,
+                conversation.title
+            )
             binding.conversationClickArea.backgroundTintList = tint
 
             // Avatar

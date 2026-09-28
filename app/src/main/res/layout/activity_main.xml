@@ -165,6 +165,35 @@
                 android:textSize="@dimen/text_size_small" />
         </LinearLayout>
 
+        <!-- Actionable load failure state. Kept separate from the empty state so
+             an unavailable provider is not presented as an empty inbox. -->
+        <LinearLayout
+            android:id="@+id/conversation_error"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:focusable="false"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="@dimen/padding_large"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/conversations_load_failed"
+                android:textColor="@color/emptyText"
+                android:textSize="@dimen/text_size_normal" />
+
+            <Button
+                android:id="@+id/btn_retry_conversations"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/padding_small"
+                android:focusable="true"
+                android:text="@string/retry"
+                android:textSize="@dimen/text_size_small" />
+        </LinearLayout>
+
     </FrameLayout>
 
 </LinearLayout>

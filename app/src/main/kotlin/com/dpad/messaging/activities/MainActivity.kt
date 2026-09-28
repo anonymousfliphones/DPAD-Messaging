@@ -21,6 +21,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.snackbar.Snackbar
 import com.dpad.messaging.App
 import com.dpad.messaging.BuildConfig
 import com.dpad.messaging.R
@@ -65,6 +66,7 @@ class MainActivity : BaseActivity() {
     /** Thread to focus after list refresh (used when returning from a conversation). */
     private var pendingFocusThreadId: Long? = null
     private var hasLoadedConversationsOnce = false
+    private var conversationLoadError = false
 
     private val requiredPermissions = buildList {
         add(Manifest.permission.READ_SMS)
@@ -163,6 +165,7 @@ class MainActivity : BaseActivity() {
         }
         binding.btnSearch.setOnClickListener { showSearch() }
         binding.btnOverflow.setOnClickListener { showOverflowMenu() }
+        binding.btnRetryConversations.setOnClickListener { loadConversations(forceRefresh = true) }
 
         // D-Pad DOWN from any toolbar button → focus first conversation
         val enterList = View.OnKeyListener { _, keyCode, event ->
@@ -252,8 +255,10 @@ class MainActivity : BaseActivity() {
         val showLoading = (!hasLoadedConversationsOnce && !showedCached) ||
             (forceRefresh && conversationsAdapter.currentList.isEmpty())
         if (showLoading) {
+            conversationLoadError = false
             binding.loadingConversations.visibility = View.VISIBLE
             binding.tvEmpty.visibility = View.GONE
+            binding.conversationError.visibility = View.GONE
             binding.rvConversations.visibility = View.INVISIBLE
         }
 
@@ -269,7 +274,7 @@ class MainActivity : BaseActivity() {
                             pinnedIds,
                             mutedThreadIds = mutedIds
                         )
-                    } ?: emptyList()
+                    } ?: throw java.io.IOException("Conversation load timed out")
                 }
                 if (!isActive) return@launch
                 hasLoadedConversationsOnce = true
@@ -280,16 +285,23 @@ class MainActivity : BaseActivity() {
                 if (!isActive) return@launch
                 hasLoadedConversationsOnce = true
                 if (conversationsAdapter.currentList.isEmpty()) {
-                    binding.tvEmpty.visibility = View.VISIBLE
+                    conversationLoadError = true
+                    binding.conversationError.visibility = View.VISIBLE
+                    binding.tvEmpty.visibility = View.GONE
+                    binding.rvConversations.visibility = View.INVISIBLE
+                } else {
+                    Snackbar.make(binding.root, R.string.conversations_load_failed, Snackbar.LENGTH_LONG).show()
                 }
             } finally {
                 binding.loadingConversations.visibility = View.GONE
-                binding.rvConversations.visibility = View.VISIBLE
+                if (!conversationLoadError) binding.rvConversations.visibility = View.VISIBLE
             }
         }
     }
 
     private fun displayConversations(conversations: List<Conversation>) {
+        conversationLoadError = false
+        binding.conversationError.visibility = View.GONE
         conversationsAdapter.submitList(conversations) {
             binding.tvEmpty.visibility = if (conversations.isEmpty()) View.VISIBLE else View.GONE
 
@@ -625,6 +637,7 @@ class MainActivity : BaseActivity() {
             add(0, 4, 3, if (Prefs.get().isThreadMuted(conversation.threadId)) getString(R.string.unmute_conversation) else getString(R.string.mute_conversation))
             add(0, 5, 4, getString(R.string.copy_number))
             add(0, 6, 5, getString(R.string.move_to_recycle_bin))
+            add(0, 7, 6, getString(R.string.conversation_details))
         }
 
         popup.setOnMenuItemClickListener { item ->
@@ -635,6 +648,7 @@ class MainActivity : BaseActivity() {
                 4 -> toggleMute(conversation)
                 5 -> copyNumber(conversation.phoneNumber)
                 6 -> moveToRecycleBin(conversation)
+                7 -> openConversationDetails(conversation)
             }
             true
         }
@@ -688,8 +702,28 @@ class MainActivity : BaseActivity() {
     }
 
     private fun toggleArchive(conversation: Conversation) {
-        Prefs.get().setThreadArchived(conversation.threadId, !conversation.archived)
+        val archive = !conversation.archived
+        Prefs.get().setThreadArchived(conversation.threadId, archive)
         loadConversations()
+        if (archive) {
+            Snackbar.make(binding.root, R.string.conversation_archived, Snackbar.LENGTH_LONG)
+                .setAction(R.string.undo) {
+                    Prefs.get().setThreadArchived(conversation.threadId, false)
+                    loadConversations()
+                }
+                .show()
+        }
+    }
+
+    private fun openConversationDetails(conversation: Conversation) {
+        startActivity(Intent(this, ConversationDetailsActivity::class.java).apply {
+            putExtra(ThreadActivity.EXTRA_THREAD_ID, conversation.threadId)
+            putExtra(ThreadActivity.EXTRA_THREAD_TITLE, conversation.title)
+            putExtra(ThreadActivity.EXTRA_PHONE_NUMBER, conversation.phoneNumber)
+            if (conversation.participants.isNotBlank()) {
+                putExtra(ThreadActivity.EXTRA_PARTICIPANTS, conversation.participants)
+            }
+        })
     }
 
     private fun toggleMute(conversation: Conversation) {

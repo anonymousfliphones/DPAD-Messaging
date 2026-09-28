@@ -363,6 +363,20 @@ class SettingsActivity : BaseActivity() {
                 startActivity(intent)
             }
         )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            navRow(
+                container = c,
+                label = getString(R.string.message_notifications),
+                summary = getString(R.string.message_notifications_summary),
+                onClick = { openNotificationChannelSettings(App.CHANNEL_MESSAGES) }
+            )
+            navRow(
+                container = c,
+                label = getString(R.string.failure_notifications),
+                summary = getString(R.string.failure_notifications_summary),
+                onClick = { openNotificationChannelSettings(App.CHANNEL_SEND_FAILURE) }
+            )
+        }
         navRow(
             container = c,
             label     = getString(R.string.about),
@@ -404,6 +418,13 @@ class SettingsActivity : BaseActivity() {
                 }
             }
         }
+    }
+
+    private fun openNotificationChannelSettings(channelId: String) {
+        startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+        })
     }
 
     private fun installUpdate(apk: java.io.File) {

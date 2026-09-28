@@ -391,6 +391,7 @@ class ThreadActivity : BaseActivity() {
     private fun setupMessageList() {
         threadAdapter = ThreadAdapter(
             onMessageLongClick = { message -> showMessageContextMenu(message) },
+            onAttachmentAction = { attachment -> showAttachmentContextMenu(attachment) },
             threadNumbers = (participants + phoneNumber).filter { it.isNotBlank() }
         )
 
@@ -1696,6 +1697,24 @@ class ThreadActivity : BaseActivity() {
                 }
             }
             .create()
+            .show()
+    }
+
+    private fun showAttachmentContextMenu(attachment: MmsAttachment) {
+        val options = arrayOf(
+            getString(R.string.save_attachments),
+            getString(R.string.share_attachment),
+            getString(R.string.open_attachment)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(attachment.fileName.ifBlank { attachment.mimeType.ifBlank { getString(R.string.attach) } })
+            .setItems(options) { _, which ->
+                when (options[which]) {
+                    getString(R.string.save_attachments) -> saveMmsAttachments(listOf(attachment))
+                    getString(R.string.share_attachment) -> shareAttachment(attachment)
+                    getString(R.string.open_attachment) -> openAttachment(attachment)
+                }
+            }
             .show()
     }
 
