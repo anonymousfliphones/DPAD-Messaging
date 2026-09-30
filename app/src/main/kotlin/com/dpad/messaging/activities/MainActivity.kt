@@ -31,6 +31,7 @@ import com.dpad.messaging.events.RefreshConversations
 import com.dpad.messaging.extensions.getConversationsFromTelephony
 import com.dpad.messaging.helpers.ConversationCache
 import com.dpad.messaging.helpers.ContactColors
+import com.dpad.messaging.helpers.ExternalComposeIntentParser
 import com.dpad.messaging.extensions.markThreadAsReadInTelephony
 import com.dpad.messaging.extensions.markThreadAsUnreadInTelephony
 import com.dpad.messaging.helpers.Prefs
@@ -503,11 +504,18 @@ class MainActivity : BaseActivity() {
         if (action != Intent.ACTION_SENDTO && action != Intent.ACTION_VIEW) return false
 
         val data = intent.data ?: return false
-        val scheme = data.scheme?.lowercase() ?: return false
-        if (scheme !in setOf("sms", "smsto", "mms", "mmsto")) return false
+        if (!ExternalComposeIntentParser.supportsScheme(data)) return false
 
-        val prefillBody = extractComposeBodyFromIntent(data, intent)
-        val recipients = extractRecipientsFromIntent(data, intent)
+        val prefillBody = ExternalComposeIntentParser.body(
+            data = data,
+            extraText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString(),
+            smsBody = intent.getStringExtra("sms_body"),
+            subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+        )
+        val recipients = ExternalComposeIntentParser.recipients(
+            data,
+            intent.getStringExtra("address")
+        )
         if (recipients.isEmpty()) {
             openNewConversation(prefillBody = prefillBody)
             return true
@@ -551,36 +559,6 @@ class MainActivity : BaseActivity() {
         return true
     }
 
-    private fun extractRecipientsFromIntent(data: Uri, intent: Intent): List<String> {
-        val rawFromUri = data.schemeSpecificPart
-            ?.removePrefix("//")
-            ?.substringBefore('?')
-            ?.trim()
-            .orEmpty()
-
-        val rawRecipients = if (rawFromUri.isNotBlank()) {
-            rawFromUri
-        } else {
-            intent.getStringExtra("address").orEmpty()
-        }
-
-        if (rawRecipients.isBlank()) return emptyList()
-
-        return rawRecipients
-            .split(',', ';')
-            .map { Uri.decode(it).trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-    }
-
-    private fun extractComposeBodyFromIntent(data: Uri, intent: Intent): String {
-        val extraBody = intent.getStringExtra("sms_body")
-            ?.takeIf { it.isNotBlank() }
-            ?: intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
-        if (!extraBody.isNullOrBlank()) return extraBody
-        return data.getQueryParameter("body")?.trim().orEmpty()
-    }
-
     private fun openNewConversation(
         recipients: List<String> = emptyList(),
         prefillBody: String = ""
@@ -607,6 +585,8 @@ class MainActivity : BaseActivity() {
             } else {
                 Telephony.Threads.getOrCreateThreadId(this, recipients.toSet())
             }
+        }.onFailure { error ->
+            android.util.Log.w("DPAD_MSG", "External compose thread resolution failed for $recipients", error)
         }.getOrNull()
     }
 

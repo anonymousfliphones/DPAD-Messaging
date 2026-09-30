@@ -1,0 +1,4 @@
+- Improve: Launch compose reliably from Contacts and other SMS apps
+- Improve: Support standard SMS/MMS intent variants, multiple recipients, URI-encoded numbers, and prefilled subjects and message text
+- Improve: Add diagnostics when external compose cannot resolve a conversation
+- Add: Durable backup and restore validation for messages, drafts, schedules, and attachments
