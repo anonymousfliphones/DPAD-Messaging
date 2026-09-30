@@ -38,12 +38,10 @@ object SmsWhitelistManager {
 
         if (mode == FilterMode.OFF) return FilterResult(true, "filtering off")
 
-        val normalized = normalize(address)
-
         return when (mode) {
             FilterMode.WHITELIST -> {
                 val allowed = parseNumbers(bundle.getString(KEY_ALLOWED, ""))
-                if (allowed.contains("*") || allowed.contains(normalized))
+                if (allowed.any { it == "*" || PhoneNumberMatcher.equivalent(it, address) })
                     FilterResult(true, "whitelist pass")
                 else
                     FilterResult(false, "not in whitelist")
@@ -51,7 +49,7 @@ object SmsWhitelistManager {
 
             FilterMode.BLOCKLIST -> {
                 val blocked = parseNumbers(bundle.getString(KEY_BLOCKED, ""))
-                if (blocked.contains(normalized))
+                if (blocked.any { PhoneNumberMatcher.equivalent(it, address) })
                     FilterResult(false, "blocklist hit")
                 else
                     FilterResult(true, "not in blocklist")
@@ -61,27 +59,6 @@ object SmsWhitelistManager {
         }
     }
 
-    private fun parseNumbers(csv: String?): Set<String> =
-        csv?.split(",")?.map { normalize(it.trim()) }?.filter { it.isNotEmpty() }?.toSet()
-            ?: emptySet()
-
-    private fun normalize(number: String): String {
-        // Wildcard that allows all.
-        if (number.trim() == "*") return "*"
-
-        // Strip everything that isn't a digit or a '+'
-        val cleaned = number.filter { it.isDigit() || it == '+' }
-        if (cleaned.isEmpty()) return ""
-
-        // Drop leading '+' if present; compare on digits only
-        val digits = cleaned.trimStart('+').filter { it.isDigit() }
-        if (digits.isEmpty()) return ""
-
-        // NANP normalization: Only strip the first digit from the number.
-        return if (digits.length == 11 && digits.startsWith("1")) {
-            digits.removePrefix("1")
-        } else {
-            digits
-        }
-    }
+    private fun parseNumbers(csv: String?): List<String> =
+        csv?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
 }

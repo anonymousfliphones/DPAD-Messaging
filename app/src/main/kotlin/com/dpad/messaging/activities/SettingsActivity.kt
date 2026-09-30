@@ -23,6 +23,7 @@ import com.dpad.messaging.BuildConfig
 import com.dpad.messaging.R
 import com.dpad.messaging.databinding.ActivitySettingsBinding
 import com.dpad.messaging.helpers.BackupManager
+import com.dpad.messaging.helpers.BackupWorker
 import com.dpad.messaging.helpers.Prefs
 import com.dpad.messaging.helpers.ThemeManager
 import com.dpad.messaging.helpers.UpdateManager
@@ -80,21 +81,13 @@ class SettingsActivity : BaseActivity() {
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri != null) {
+            takePersistablePermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             AlertDialog.Builder(this)
                 .setTitle(R.string.backup_warning_title)
                 .setMessage(R.string.backup_warning_message)
                 .setPositiveButton(R.string.backup_confirm) { _, _ ->
-                    lifecycleScope.launch {
-                        try {
-                            val json = withContext(Dispatchers.IO) { BackupManager.backup(this@SettingsActivity) }
-                            withContext(Dispatchers.IO) {
-                                contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
-                            }
-                            Toast.makeText(this@SettingsActivity, R.string.backup_success, Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(this@SettingsActivity, "${getString(R.string.backup_failed)} ${e.message}", Toast.LENGTH_LONG).show()
-                        }
-                    }
+                    BackupWorker.enqueue(this, uri, BackupWorker.OP_BACKUP)
+                    Toast.makeText(this, R.string.backup_queued, Toast.LENGTH_SHORT).show()
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
@@ -105,24 +98,33 @@ class SettingsActivity : BaseActivity() {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
+            takePersistablePermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             lifecycleScope.launch {
                 try {
-                    val json = withContext(Dispatchers.IO) {
-                        contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: ""
-                    }
-                    if (json.isBlank()) {
-                        Toast.makeText(this@SettingsActivity, R.string.restore_invalid, Toast.LENGTH_SHORT).show()
-                        return@launch
-                    }
-                    val result = withContext(Dispatchers.IO) { BackupManager.restore(this@SettingsActivity, json) }
-                    val msg = if (result.success) R.string.restore_success else R.string.restore_failed
-                    Toast.makeText(this@SettingsActivity, getString(msg) + " " + result.message, Toast.LENGTH_LONG).show()
-                    if (result.success) recreate()
+                    val preview = withContext(Dispatchers.IO) { BackupManager.preview(this@SettingsActivity, uri) }
+                    AlertDialog.Builder(this@SettingsActivity)
+                        .setTitle(R.string.restore_preview_title)
+                        .setMessage(getString(
+                            R.string.restore_preview_message,
+                            preview.conversationCount,
+                            preview.messageCount,
+                            preview.attachmentCount
+                        ))
+                        .setPositiveButton(R.string.restore_confirm) { _, _ ->
+                            BackupWorker.enqueue(this@SettingsActivity, uri, BackupWorker.OP_RESTORE)
+                            Toast.makeText(this@SettingsActivity, R.string.restore_queued, Toast.LENGTH_SHORT).show()
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
                 } catch (e: Exception) {
                     Toast.makeText(this@SettingsActivity, "${getString(R.string.restore_failed)} ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
+    }
+
+    private fun takePersistablePermission(uri: Uri, flags: Int) {
+        runCatching { contentResolver.takePersistableUriPermission(uri, flags) }
     }
 
     override fun onResume() {
@@ -279,12 +281,20 @@ class SettingsActivity : BaseActivity() {
             label        = getString(R.string.lock_screen_privacy),
             summary      = getString(R.string.lock_screen_privacy_summary),
             getValue     = { prefs.lockScreenPrivacy },
-            optionValues = listOf(Prefs.PRIVACY_FULL, Prefs.PRIVACY_SENDER_ONLY),
+            optionValues = listOf(Prefs.PRIVACY_FULL, Prefs.PRIVACY_SENDER_ONLY, Prefs.PRIVACY_NONE),
             optionLabels = listOf(
                 getString(R.string.show_sender_and_message),
-                getString(R.string.show_sender_only)
+                getString(R.string.show_sender_only),
+                getString(R.string.show_no_message_details)
             ),
             setValue     = { prefs.lockScreenPrivacy = it }
+        )
+        toggleRow(
+            container = c,
+            label = getString(R.string.silent_unknown_senders),
+            summary = getString(R.string.silent_unknown_senders_summary),
+            getValue = { prefs.silentUnknownSenders },
+            setValue = { prefs.silentUnknownSenders = it }
         )
         navRow(
             container = c,

@@ -25,8 +25,15 @@ class ConversationsAdapter(
     private val onConversationClick: (Conversation) -> Unit,
     private val onConversationLongClick: (Conversation) -> Unit,
     private val onConversationMenuClick: (View, Conversation) -> Unit,
-    private val onAvatarLongClick: ((Conversation) -> Unit)? = null
+    private val onAvatarLongClick: ((Conversation) -> Unit)? = null,
+    private val isConversationSelected: (Long) -> Boolean = { false }
 ) : ListAdapter<Conversation, ConversationsAdapter.ConversationViewHolder>(DIFF_CALLBACK) {
+
+    init {
+        setHasStableIds(true)
+    }
+
+    override fun getItemId(position: Int): Long = getItem(position).threadId
 
     companion object {
         private val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Conversation>() {
@@ -134,6 +141,7 @@ class ConversationsAdapter(
 
             // Interactions
             binding.conversationClickArea.setOnClickListener { onConversationClick(conversation) }
+            binding.conversationClickArea.isSelected = isConversationSelected(conversation.threadId)
             binding.conversationClickArea.setOnLongClickListener {
                 onConversationLongClick(conversation)
                 true

@@ -379,6 +379,14 @@ object MessageSenders {
         scheduledDate: Long,
         subscriptionId: Int = -1
     ): Long {
+        attachmentUris.forEach { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+        }
         val messageId = generateScheduledMessageId()
         val attachmentsJson = JSONArray(attachmentUris.map { it.toString() }).toString()
         val participantsJson = JSONArray(recipients).toString()

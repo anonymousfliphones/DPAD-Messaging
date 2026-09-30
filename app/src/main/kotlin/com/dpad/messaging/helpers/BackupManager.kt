@@ -1,6 +1,7 @@
 package com.dpad.messaging.helpers
 
 import android.content.Context
+import android.net.Uri
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.room.withTransaction
@@ -11,8 +12,11 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import android.util.Base64
+import java.io.InputStream
 import java.security.KeyStore
 import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.CipherOutputStream
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -46,10 +50,72 @@ object BackupManager {
      */
     @Suppress("UNUSED_PARAMETER")
     suspend fun backup(context: Context): String {
+        val data = collectData()
+
+        val plaintext = json.encodeToString(data)
+        return encrypt(plaintext)
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun backupToUri(context: Context, uri: Uri, onProgress: suspend (Int) -> Unit) {
+        val data = collectData()
+        val output = context.contentResolver.openOutputStream(uri)
+            ?: error("Unable to open backup destination")
+        output.use { raw ->
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+            raw.write(cipher.iv)
+            onProgress(20)
+            CipherOutputStream(raw, cipher).use { encrypted ->
+                encrypted.write(json.encodeToString(data).toByteArray(Charsets.UTF_8))
+            }
+        }
+        onProgress(100)
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun restoreFromUri(context: Context, uri: Uri, onProgress: suspend (Int) -> Unit): BackupResult {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: return BackupResult(false, "Unable to open backup file")
+        return input.use { raw ->
+            try {
+                val iv = raw.readExactBytes(GCM_IV_LENGTH)
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_LENGTH, iv))
+                onProgress(20)
+                val data = CipherInputStream(raw, cipher).use { encrypted ->
+                    json.decodeFromString<BackupData>(encrypted.bufferedReader().use { it.readText() })
+                }
+                if (data.version != 1) {
+                    return@use BackupResult(false, "Unsupported backup version: ${data.version}")
+                }
+                onProgress(60)
+                restoreData(data)
+            } catch (e: Exception) {
+                BackupResult(false, "Could not restore backup: ${e.message}")
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun preview(context: Context, uri: Uri): BackupPreview {
+        val input = context.contentResolver.openInputStream(uri)
+            ?: error("Unable to open backup file")
+        return input.use { raw ->
+            val iv = raw.readExactBytes(GCM_IV_LENGTH)
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(GCM_TAG_LENGTH, iv))
+            CipherInputStream(raw, cipher).use { encrypted ->
+                val data = json.decodeFromString<BackupData>(encrypted.bufferedReader().use { it.readText() })
+                BackupPreview(data.timestamp, data.messages.size, data.conversations.size, data.attachments.size)
+            }
+        }
+    }
+
+    private suspend fun collectData(): BackupData {
         val db = App.get().database
         val prefs = Prefs.get()
-
-        val data = BackupData(
+        return BackupData(
             timestamp = System.currentTimeMillis(),
             conversations = db.conversationsDao().getConversations(),
             messages = db.messagesDao().getAllMessages(),
@@ -70,15 +136,12 @@ object BackupManager {
                 appAccent = prefs.appAccent,
                 dateFormat = prefs.dateFormat,
                 timeFormat = prefs.timeFormat,
-    uiScale = prefs.uiScale,
+                uiScale = prefs.uiScale,
                 mutedThreads = prefs.getMutedThreadIds().map { it.toString() }.toSet(),
                 pinnedThreads = prefs.getPinnedThreadIds().map { it.toString() }.toSet(),
                 archivedThreads = prefs.getArchivedThreadIds().map { it.toString() }.toSet()
             )
         )
-
-        val plaintext = json.encodeToString(data)
-        return encrypt(plaintext)
     }
 
     /**
@@ -96,9 +159,6 @@ object BackupManager {
             return BackupResult(false, "Could not decrypt backup: ${e.message}")
         }
 
-        val db = App.get().database
-        val prefs = Prefs.get()
-
         val data = try {
             json.decodeFromString<BackupData>(decrypted)
         } catch (e: Exception) {
@@ -109,6 +169,12 @@ object BackupManager {
             return BackupResult(false, "Unsupported backup version: ${data.version}")
         }
 
+        return restoreData(data)
+    }
+
+    private suspend fun restoreData(data: BackupData): BackupResult {
+        val db = App.get().database
+        val prefs = Prefs.get()
         try {
             // All Room writes happen inside a single transaction so a failure
             // midway leaves the database unchanged rather than half-restored.
@@ -214,6 +280,24 @@ object BackupManager {
         return String(cipher.doFinal(ct), Charsets.UTF_8)
     }
 }
+
+private fun InputStream.readExactBytes(count: Int): ByteArray {
+    val bytes = ByteArray(count)
+    var offset = 0
+    while (offset < count) {
+        val read = read(bytes, offset, count - offset)
+        if (read < 0) error("Invalid backup header")
+        offset += read
+    }
+    return bytes
+}
+
+data class BackupPreview(
+    val timestamp: Long,
+    val messageCount: Int,
+    val conversationCount: Int,
+    val attachmentCount: Int
+)
 
 data class BackupResult(
     val success: Boolean,

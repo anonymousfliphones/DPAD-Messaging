@@ -12,11 +12,14 @@ import android.telephony.SmsManager
 import android.util.Log
 import com.dpad.messaging.App
 import com.dpad.messaging.BuildConfig
+import com.dpad.messaging.R
 import com.dpad.messaging.models.Message
+import com.dpad.messaging.models.MmsAttachmentJson
 import com.dpad.messaging.events.RefreshConversations
 import com.dpad.messaging.events.RefreshMessages
 import com.dpad.messaging.helpers.AppCoroutineScopes
 import com.dpad.messaging.helpers.MmsSender
+import com.dpad.messaging.helpers.NotificationHelper
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
 import java.io.File
@@ -56,7 +59,7 @@ class MmsSentReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun processReceive(context: Context, intent: Intent, resultCode: Int) {
+    private suspend fun processReceive(context: Context, intent: Intent, resultCode: Int) {
         val threadId = intent.getLongExtra(MmsSender.EXTRA_THREAD_ID, -1L)
         val hasImage = intent.getBooleanExtra("extra_has_image", false)
         val isSuccess = resultCode == Activity.RESULT_OK
@@ -74,12 +77,16 @@ class MmsSentReceiver : BroadcastReceiver() {
         // supplies an HTTP status only when the MMSC itself rejected the request.
         val httpStatus = intent.getIntExtra(SmsManager.EXTRA_MMS_HTTP_STATUS, -1)
 
-        val contentUri = extractContentUri(intent)
+        val callbackUri = extractContentUri(intent)
+        val contentUri = callbackUri ?: if (threadId > 0) {
+            updateLatestOutboxForThread(context, threadId, targetMsgBox)
+        } else {
+            null
+        }
         if (contentUri != null) {
             updateMsgBoxByUri(context, contentUri, targetMsgBox)
         } else if (threadId > 0) {
-            Log.w(TAG, "MmsSentReceiver: no message URI on callback; falling back to thread scan")
-            updateLatestOutboxForThread(context, threadId, targetMsgBox)
+            Log.w(TAG, "MmsSentReceiver: no message URI on callback; no matching outbox row")
         }
 
         cleanupTempPduFile(intent)
@@ -94,6 +101,21 @@ class MmsSentReceiver : BroadcastReceiver() {
 
         if (!isSuccess) {
             Log.w(TAG, "MmsSentReceiver: MMS send failed resultCode=$resultCode httpStatus=$httpStatus")
+            val messageId = contentUri?.lastPathSegment?.toLongOrNull() ?: -1L
+            if (messageId > 0L) {
+                val failedMessage = App.get().database.messagesDao().getMessage(messageId)
+                NotificationHelper.showSendFailureNotification(
+                    context = context,
+                    messageId = messageId,
+                    threadId = threadId,
+                    phoneNumber = failedMessage?.address.orEmpty(),
+                    reason = if (httpStatus > 0) {
+                        context.getString(R.string.mms_send_error_http, httpStatus)
+                    } else {
+                        context.getString(R.string.mms_send_error_unknown, resultCode)
+                    }
+                )
+            }
         }
 
         EventBus.getDefault().post(RefreshConversations())
@@ -104,9 +126,10 @@ class MmsSentReceiver : BroadcastReceiver() {
         if (scheduledMessageId > 0L) {
             AppCoroutineScopes.io.launch {
                 val dao = App.get().database.messagesDao()
-                val scheduled = dao.getMessage(scheduledMessageId) ?: return@launch
-                if (isSuccess) {
-                    dao.deleteMessage(scheduledMessageId)
+                    val scheduled = dao.getMessage(scheduledMessageId) ?: return@launch
+                    if (isSuccess) {
+                        revokeAttachmentPermissions(context, scheduled.attachmentsJson)
+                        dao.deleteMessage(scheduledMessageId)
                 } else {
                     dao.updateMessage(
                         scheduled.copy(
@@ -168,17 +191,31 @@ class MmsSentReceiver : BroadcastReceiver() {
      * always sets the row URI as the intent data, so this should be unreachable; it is
      * retained only so an unexpected callback cannot leave rows stranded in the outbox.
      */
-    private fun updateLatestOutboxForThread(context: Context, threadId: Long, msgBox: Int) {
+    private fun updateLatestOutboxForThread(context: Context, threadId: Long, msgBox: Int): Uri? {
         val mmsUri = Uri.parse("content://mms")
         try {
-            context.contentResolver.update(
+            val rowUri = context.contentResolver.query(
                 mmsUri,
-                ContentValues().apply { put(Telephony.Mms.MESSAGE_BOX, msgBox) },
+                arrayOf(Telephony.Mms._ID),
                 "${Telephony.Mms.THREAD_ID} = ? AND ${Telephony.Mms.MESSAGE_BOX} = ?",
-                arrayOf(threadId.toString(), Telephony.Mms.MESSAGE_BOX_OUTBOX.toString())
-            )
+                arrayOf(threadId.toString(), Telephony.Mms.MESSAGE_BOX_OUTBOX.toString()),
+                "${Telephony.Mms.DATE} DESC"
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) Uri.withAppendedPath(mmsUri, cursor.getLong(0).toString()) else null
+            }
+            if (rowUri != null) {
+                Log.w(TAG, "MmsSentReceiver: using latest outbox row only uri=$rowUri")
+                context.contentResolver.update(
+                    rowUri,
+                    ContentValues().apply { put(Telephony.Mms.MESSAGE_BOX, msgBox) },
+                    null,
+                    null
+                )
+            }
+            return rowUri
         } catch (e: Exception) {
             Log.w(TAG, "MmsSentReceiver: failed fallback update for threadId=$threadId", e)
+            return null
         }
     }
 
@@ -191,6 +228,17 @@ class MmsSentReceiver : BroadcastReceiver() {
             Log.d(TAG, "MmsSentReceiver: temp file cleanup path=$filePath deleted=$deleted")
         }.onFailure { e ->
             Log.w(TAG, "MmsSentReceiver: temp file cleanup failed path=$filePath", e)
+        }
+    }
+
+    private fun revokeAttachmentPermissions(context: Context, raw: String) {
+        MmsAttachmentJson.decode(raw).forEach { attachment ->
+            runCatching {
+                context.contentResolver.releasePersistableUriPermission(
+                    attachment.contentUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
         }
     }
 }

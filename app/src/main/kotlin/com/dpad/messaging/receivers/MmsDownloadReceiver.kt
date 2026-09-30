@@ -19,6 +19,7 @@ import com.dpad.messaging.events.RefreshMessages
 import com.dpad.messaging.helpers.AppCoroutineScopes
 import com.dpad.messaging.helpers.MmsHelper
 import com.dpad.messaging.helpers.NotificationHelper
+import com.dpad.messaging.helpers.PhoneNumberMatcher
 import com.dpad.messaging.helpers.SmsWhitelistManager
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
@@ -87,6 +88,13 @@ class MmsDownloadReceiver : BroadcastReceiver() {
         // no extra, so ignore resultCode/msgId for it. Only a PendingIntent-style
         // MMS_DOWNLOADED result with a failed resultCode should trigger cleanup.
         val isLibraryNotify = action == LIB_ACTION
+        if (isLibraryNotify) {
+            // Route library completion through the durable worker so this legacy
+            // compatibility receiver cannot create a second notification path.
+            if (msgId > 0L) MmsReceiveWorker.enqueue(context, msgId)
+            else MmsReceiveWorker.enqueueFallback(context)
+            return
+        }
         if (result != Activity.RESULT_OK && !isLibraryNotify) {
             w { "MmsDownloadReceiver: download failed with resultCode=$result" }
             // Delete the placeholder row so it doesn't linger as a ghost entry.
@@ -277,11 +285,8 @@ class MmsDownloadReceiver : BroadcastReceiver() {
 
             val keywords = App.get().database.blockedKeywordsDao().getAll()
             val blockedNumbers = App.get().database.blockedNumbersDao().getAll()
-            val normalizedAddrDigits = address.filter { it.isDigit() }
-
             val isBlockedByNumber = blockedNumbers.any { bn ->
-                val ndigits = bn.number.filter { it.isDigit() }
-                bn.number == address || ndigits == normalizedAddrDigits
+                PhoneNumberMatcher.equivalent(bn.number, address)
             }
 
             val isBlockedByKeyword = keywords.any { kw ->

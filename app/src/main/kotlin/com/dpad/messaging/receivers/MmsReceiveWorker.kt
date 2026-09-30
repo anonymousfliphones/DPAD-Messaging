@@ -17,6 +17,7 @@ import com.dpad.messaging.helpers.MessageCache
 import com.dpad.messaging.helpers.MmsHelper
 import com.dpad.messaging.helpers.MmsPartCache
 import com.dpad.messaging.helpers.NotificationHelper
+import com.dpad.messaging.helpers.PhoneNumberMatcher
 import com.dpad.messaging.helpers.SmsWhitelistManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -71,8 +72,7 @@ class MmsReceiveWorker(
         val body = MmsHelper.getMmsDisplayBody(applicationContext, msgId, row.subject)
         val blockedNumbers = App.get().database.blockedNumbersDao().getAll()
         val blockedKeywords = App.get().database.blockedKeywordsDao().getAll()
-        val fromDigits = from.filter { it.isDigit() }
-        val blockedByNumber = blockedNumbers.any { it.number == from || it.number.filter(Char::isDigit) == fromDigits }
+        val blockedByNumber = blockedNumbers.any { PhoneNumberMatcher.equivalent(it.number, from) }
         val blockedByKeyword = blockedKeywords.any { body.contains(it.keyword, ignoreCase = true) }
 
         if (!blockedByNumber && !blockedByKeyword && from.isNotBlank()) {
@@ -166,7 +166,11 @@ class MmsReceiveWorker(
 
         fun enqueueFallback(context: Context) {
             val request = OneTimeWorkRequestBuilder<MmsReceiveWorker>().build()
-            WorkManager.getInstance(context).enqueue(request)
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "mms-receive-fallback",
+                ExistingWorkPolicy.KEEP,
+                request
+            )
         }
     }
 }

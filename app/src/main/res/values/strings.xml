@@ -28,6 +28,10 @@
 
     <!-- ─── Conversation List ─── -->
     <string name="no_conversations">No messages yet.\nPress New to start a conversation.</string>
+    <string name="no_search_results">No conversations match your search.</string>
+    <string name="attachments_selected">%1$d attachments selected</string>
+    <string name="selection_count">%1$d selected</string>
+    <string name="select_conversation">Select conversation</string>
     <string name="loading_conversations">Loading conversations…</string>
     <string name="conversations_load_failed">Could not load conversations.</string>
     <string name="retry">Retry</string>
@@ -145,6 +149,9 @@
     <string name="lock_screen_privacy_summary">Control what appears in lock screen notifications</string>
     <string name="show_sender_and_message">Show sender and message</string>
     <string name="show_sender_only">Show sender only</string>
+    <string name="show_no_message_details">Show no message details</string>
+    <string name="silent_unknown_senders">Silent unknown senders</string>
+    <string name="silent_unknown_senders_summary">Do not play sound or show heads-up alerts for numbers not in contacts</string>
     <string name="manage_blocked_keywords">Blocked Keywords</string>
     <string name="blocked_keywords_summary">Block notifications from messages containing keywords</string>
     <string name="manage_blocked_numbers">Blocked Numbers</string>
@@ -178,6 +185,8 @@
     <string name="sms_send_error_null_pdu">SMS failed: invalid message payload.</string>
     <string name="sms_send_error_no_service">SMS failed: no cellular service.</string>
     <string name="sms_send_error_unknown">SMS failed (code %1$d).</string>
+    <string name="mms_send_error_http">MMS rejected by carrier (HTTP %1$d).</string>
+    <string name="mms_send_error_unknown">MMS failed (code %1$d).</string>
     <string name="scheduled_send_failed_title">Scheduled message failed</string>
     <string name="scheduled_send_failed_body">A scheduled message could not be sent.</string>
     <string name="scheduled_send_failed_exact_alarm_body">Scheduled send failed because exact alarms are unavailable.</string>
@@ -255,6 +264,17 @@
     <string name="backup_warning_title">Sensitive Data Warning</string>
     <string name="backup_warning_message">The backup file contains app-only data: scheduled messages, drafts, recycle-bin items, blocked lists, conversation settings, and app preferences. Your SMS/MMS history is stored by the system and is not included. The file is encrypted and can only be restored on this device, not on another device. Keep the file in a safe place.</string>
     <string name="backup_confirm">Create Backup</string>
+    <string name="backup_queued">Backup started in the background</string>
+    <string name="backup_running">Creating encrypted backup</string>
+    <string name="restore_running">Restoring encrypted backup</string>
+    <string name="backup_complete">Backup and restore</string>
+    <string name="restore_complete">Restore completed</string>
+    <string name="backup_finished">Operation completed</string>
+    <string name="restore_queued">Restore started in the background</string>
+    <string name="restore_preview_title">Review restore</string>
+    <string name="restore_preview_message">This will replace app-local data with %1$d conversations, %2$d messages, and %3$d attachments. SMS/MMS history in the Telephony provider is not included.</string>
+    <string name="restore_confirm">Restore</string>
+    <string name="backup_scope_summary">App-local data only. Telephony SMS/MMS history is not included.</string>
     <string name="check_for_updates">Check for updates</string>
     <string name="check_for_updates_summary">Download and install the latest signed release</string>
     <string name="checking_for_updates">Checking for updates…</string>

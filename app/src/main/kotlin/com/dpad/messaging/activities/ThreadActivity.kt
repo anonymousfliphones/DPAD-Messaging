@@ -33,6 +33,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
@@ -68,6 +69,7 @@ import kotlinx.coroutines.withContext
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
+import org.json.JSONArray
 import java.io.File
 import java.text.DateFormat
 import java.util.Calendar
@@ -198,7 +200,7 @@ class ThreadActivity : BaseActivity() {
                 } catch (_: Exception) {
                     // Not all providers offer persistable permissions.
                 }
-                setPendingAttachment(uri)
+                setPendingAttachment(uri, append = true)
             }
         }
 
@@ -265,6 +267,7 @@ class ThreadActivity : BaseActivity() {
         loadSimInfo()
         loadMessages()
         markThreadRead()
+        handleRetryIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -276,6 +279,7 @@ class ThreadActivity : BaseActivity() {
         setupToolbar()
         loadMessages()
         markThreadRead()
+        handleRetryIntent(intent)
     }
 
     override fun onResume() {
@@ -572,6 +576,15 @@ class ThreadActivity : BaseActivity() {
             if (draft != null) {
                 binding.etMessage.setText(draft.body)
                 binding.etMessage.setSelection(draft.body.length)
+                selectedSubId = draft.subscriptionId
+                val draftUris = parseJsonArray(draft.attachmentUrisJson)
+                    .mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
+                if (draftUris.isNotEmpty()) {
+                    pendingAttachmentUris.clear()
+                    pendingAttachmentUris.addAll(draftUris)
+                    pendingAttachmentUri = draftUris.first()
+                    showAttachmentPreview(draftUris.first())
+                }
             }
         }
 
@@ -595,6 +608,16 @@ class ThreadActivity : BaseActivity() {
         // Compose bar gets initial focus
         binding.etMessage.requestFocus()
         updateScheduledUi()
+
+        ViewCompat.setOnReceiveContentListener(binding.etMessage, arrayOf("image/*")) { _, content ->
+            var handled = false
+            for (index in 0 until content.clip.itemCount) {
+                val uri = content.clip.getItemAt(index).uri ?: continue
+                setPendingAttachment(uri, append = true)
+                handled = true
+            }
+            if (handled) null else content
+        }
     }
 
     private fun updateComposeToolsVisibility() {
@@ -896,7 +919,11 @@ class ThreadActivity : BaseActivity() {
                 val label = withContext(Dispatchers.IO) {
                     resolveAttachmentPreviewLabel(uri, mimeType)
                 }
-                binding.tvAttachmentPreviewLabel.text = label
+                binding.tvAttachmentPreviewLabel.text = if (pendingAttachmentUris.size > 1) {
+                    getString(R.string.attachments_selected, pendingAttachmentUris.size)
+                } else {
+                    label
+                }
                 updateAttachmentReplayUi(isAudioAttachment = mimeType.startsWith("audio/"))
 
                 when {
@@ -1003,7 +1030,11 @@ class ThreadActivity : BaseActivity() {
         updateSendButtonState()
     }
 
-    private fun setPendingAttachment(uri: Uri, ownedVoiceFile: File? = null) {
+    private fun setPendingAttachment(
+        uri: Uri,
+        ownedVoiceFile: File? = null,
+        append: Boolean = false
+    ) {
         if (!AttachmentPolicy.isWithinMmsLimit(this, uri)) {
             if (ownedVoiceFile != null) runCatching { ownedVoiceFile.delete() }
             val mimeType = AttachmentPolicy.resolveMimeType(this, uri)
@@ -1015,14 +1046,16 @@ class ThreadActivity : BaseActivity() {
             android.widget.Toast.makeText(this, res, android.widget.Toast.LENGTH_SHORT).show()
             return
         }
-        if (pendingVoiceAttachmentFile != null && pendingVoiceAttachmentFile != ownedVoiceFile) {
+        if (!append && pendingVoiceAttachmentFile != null && pendingVoiceAttachmentFile != ownedVoiceFile) {
             runCatching { pendingVoiceAttachmentFile?.delete() }
         }
-        pendingVoiceAttachmentFile = ownedVoiceFile
-        pendingAttachmentUri = uri
-        pendingAttachmentUris.clear()
-        pendingAttachmentUris.add(uri)
-        showAttachmentPreview(uri)
+        if (!append || ownedVoiceFile != null) {
+            pendingVoiceAttachmentFile = ownedVoiceFile
+        }
+        if (!append) pendingAttachmentUris.clear()
+        if (!pendingAttachmentUris.contains(uri)) pendingAttachmentUris.add(uri)
+        pendingAttachmentUri = pendingAttachmentUris.firstOrNull() ?: uri
+        showAttachmentPreview(pendingAttachmentUri ?: uri)
     }
 
     private fun resolveAttachmentPreviewLabel(uri: Uri, mimeType: String): String {
@@ -1380,6 +1413,20 @@ class ThreadActivity : BaseActivity() {
             ?: listOf(phoneNumber).filter { it.isNotBlank() }
     }
 
+    private fun handleRetryIntent(intent: Intent?) {
+        val messageId = intent?.getLongExtra(EXTRA_RETRY_MESSAGE_ID, -1L) ?: -1L
+        if (messageId <= 0L) return
+
+        intent?.removeExtra(EXTRA_RETRY_MESSAGE_ID)
+        NotificationHelper.cancelFailureNotification(this, messageId)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val message = App.get().database.messagesDao().getMessage(messageId) ?: return@launch
+            withContext(Dispatchers.Main) {
+                retryMessage(message)
+            }
+        }
+    }
+
     private fun handleCallAction() {
         val candidates = (participants + phoneNumber)
             .map { it.trim() }
@@ -1415,7 +1462,7 @@ class ThreadActivity : BaseActivity() {
     private fun markThreadRead() {
         if (threadId <= 0L) return
 
-        NotificationHelper.cancelNotification(this, threadId.toInt())
+        NotificationHelper.cancelNotification(this, NotificationHelper.threadNotificationId(threadId))
         lifecycleScope.launch(Dispatchers.IO) {
             App.get().database.messagesDao().markThreadRead(threadId)
             App.get().database.conversationsDao().markAsRead(threadId)
@@ -1424,29 +1471,20 @@ class ThreadActivity : BaseActivity() {
     }
 
     private fun saveDraft() {
-        var body = binding.etMessage.text?.toString() ?: ""
-        
-        // Include chips in the draft
-        val chipNumbers = mutableListOf<String>()
-        for (i in 0 until binding.chipsContainer.childCount) {
-            val chipButton = binding.chipsContainer.getChildAt(i) as? android.widget.Button
-            chipButton?.text?.toString()?.let { chipNumbers.add(it) }
-        }
-        if (chipNumbers.isNotEmpty()) {
-            body = if (body.isNotBlank()) {
-                "$body ${chipNumbers.joinToString(" ")}"
-            } else {
-                chipNumbers.joinToString(" ")
-            }
-        }
-        
+        val body = binding.etMessage.text?.toString() ?: ""
+        val attachmentUrisJson = JSONArray(pendingAttachmentUris.map { it.toString() }).toString()
         lifecycleScope.launch(Dispatchers.IO) {
             val dao = App.get().database.draftsDao()
-            if (body.isBlank()) {
+            if (body.isBlank() && pendingAttachmentUris.isEmpty()) {
                 dao.deleteDraft(threadId)
             } else {
                 dao.insertDraft(
-                    com.dpad.messaging.models.Draft(threadId = threadId, body = body)
+                    com.dpad.messaging.models.Draft(
+                        threadId = threadId,
+                        body = body,
+                        attachmentUrisJson = attachmentUrisJson,
+                        subscriptionId = selectedSubId
+                    )
                 )
             }
         }
@@ -1851,6 +1889,7 @@ class ThreadActivity : BaseActivity() {
     private fun cancelScheduledMessage(message: Message) {
         lifecycleScope.launch(Dispatchers.IO) {
             ScheduledMessageScheduler.cancelMessage(this@ThreadActivity, message.id)
+            revokeAttachmentPermissions(message.attachmentsJson)
             App.get().database.messagesDao().deleteMessage(message.id)
             EventBus.getDefault().post(RefreshMessages(threadId))
             EventBus.getDefault().post(com.dpad.messaging.events.RefreshConversations())
@@ -1861,6 +1900,17 @@ class ThreadActivity : BaseActivity() {
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
                 loadMessages()
+            }
+        }
+    }
+
+    private fun revokeAttachmentPermissions(raw: String) {
+        MmsAttachmentJson.decode(raw).forEach { attachment ->
+            runCatching {
+                contentResolver.releasePersistableUriPermission(
+                    attachment.contentUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
             }
         }
     }
@@ -2056,6 +2106,7 @@ class ThreadActivity : BaseActivity() {
         const val EXTRA_THREAD_ID    = "extra_thread_id"
         const val EXTRA_THREAD_TITLE = "extra_thread_title"
         const val EXTRA_PHONE_NUMBER = "extra_phone_number"
+        const val EXTRA_RETRY_MESSAGE_ID = "extra_retry_message_id"
         const val EXTRA_PREFILL_ATTACHMENT_URI = "extra_prefill_attachment_uri"
         const val EXTRA_PREFILL_ATTACHMENT_URIS = "extra_prefill_attachment_uris"
         /** Comma-separated participant numbers; present for group threads. */

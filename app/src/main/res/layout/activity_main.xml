@@ -73,6 +73,47 @@
 
     </LinearLayout>
 
+    <!-- Explicit selection mode for keypad/D-pad users; no swipe or long-press required. -->
+    <LinearLayout
+        android:id="@+id/selection_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_height"
+        android:background="@color/toolbarBg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/toolbar_padding_h"
+        android:paddingEnd="@dimen/toolbar_padding_h"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_selection_count"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/toolbarText"
+            android:textSize="@dimen/text_size_title"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_selection_archive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/archive" />
+
+        <Button
+            android:id="@+id/btn_selection_read"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/mark_as_read" />
+
+        <Button
+            android:id="@+id/btn_selection_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/cancel"
+            android:text="@string/cancel" />
+    </LinearLayout>
+
     <!-- ─── Search Overlay (GONE by default) ───────────────────────────── -->
     <LinearLayout
         android:id="@+id/search_bar"

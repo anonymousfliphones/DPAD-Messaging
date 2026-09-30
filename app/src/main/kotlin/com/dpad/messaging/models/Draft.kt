@@ -15,6 +15,12 @@ data class Draft(
     @ColumnInfo(name = "body")
     val body: String,
 
+    @ColumnInfo(name = "attachment_uris_json")
+    val attachmentUrisJson: String = "[]",
+
+    @ColumnInfo(name = "subscription_id")
+    val subscriptionId: Int = -1,
+
     @ColumnInfo(name = "date")
     val date: Long = System.currentTimeMillis()
 )

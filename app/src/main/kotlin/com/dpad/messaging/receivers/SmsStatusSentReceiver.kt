@@ -14,6 +14,7 @@ import com.dpad.messaging.BuildConfig
 import com.dpad.messaging.events.RefreshConversations
 import com.dpad.messaging.events.RefreshMessages
 import com.dpad.messaging.helpers.AppCoroutineScopes
+import com.dpad.messaging.helpers.NotificationHelper
 import com.dpad.messaging.helpers.SmsMultipartTracker
 import com.dpad.messaging.helpers.SmsSender
 import com.dpad.messaging.models.Message
@@ -83,6 +84,17 @@ class SmsStatusSentReceiver : BroadcastReceiver() {
 
                 SmsSender.updateMessageType(context, msgId, messageType)
 
+                if (!aggregate.isSuccess && msgId > 0L) {
+                    val failedMessage = App.get().database.messagesDao().getMessage(msgId)
+                    NotificationHelper.showSendFailureNotification(
+                        context = context,
+                        messageId = msgId,
+                        threadId = threadId,
+                        phoneNumber = failedMessage?.address.orEmpty(),
+                        reason = failureMessage(context, receiverResultCode)
+                    )
+                }
+
                 if (scheduledMessageId > 0L) {
                     val dao = App.get().database.messagesDao()
                     val scheduled = dao.getMessage(scheduledMessageId)
@@ -109,14 +121,18 @@ class SmsStatusSentReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showFailureToast(context: Context, resultCode: Int) {
-        val message = when (resultCode) {
+    private fun failureMessage(context: Context, resultCode: Int): String {
+        return when (resultCode) {
             SmsManager.RESULT_ERROR_GENERIC_FAILURE -> context.getString(R.string.sms_send_error_generic_failure)
             SmsManager.RESULT_ERROR_RADIO_OFF -> context.getString(R.string.sms_send_error_radio_off)
             SmsManager.RESULT_ERROR_NULL_PDU -> context.getString(R.string.sms_send_error_null_pdu)
             SmsManager.RESULT_ERROR_NO_SERVICE -> context.getString(R.string.sms_send_error_no_service)
             else -> context.getString(R.string.sms_send_error_unknown, resultCode)
         }
+    }
+
+    private fun showFailureToast(context: Context, resultCode: Int) {
+        val message = failureMessage(context, resultCode)
         AppCoroutineScopes.main.launch {
             Toast.makeText(context.applicationContext, message, Toast.LENGTH_SHORT).show()
         }

@@ -11,6 +11,7 @@ import android.provider.Telephony
 import android.telephony.PhoneNumberUtils
 import android.telephony.SmsManager
 import android.util.Log
+import com.dpad.messaging.R
 import com.dpad.messaging.helpers.SmsWhitelistManager
 import com.dpad.messaging.receivers.SmsStatusDeliveredReceiver
 import com.dpad.messaging.receivers.SmsStatusSentReceiver
@@ -163,7 +164,16 @@ object SmsSender {
         } catch (e: Exception) {
             e.printStackTrace()
             // Immediately mark FAILED so the UI reflects reality.
-            if (msgId > 0) updateMessageType(context, msgId, Telephony.Sms.MESSAGE_TYPE_FAILED)
+            if (msgId > 0) {
+                updateMessageType(context, msgId, Telephony.Sms.MESSAGE_TYPE_FAILED)
+                NotificationHelper.showSendFailureNotification(
+                    context = context,
+                    messageId = msgId,
+                    threadId = threadId,
+                    phoneNumber = destination,
+                    reason = context.getString(R.string.sms_send_error_generic_failure)
+                )
+            }
         }
     }
 

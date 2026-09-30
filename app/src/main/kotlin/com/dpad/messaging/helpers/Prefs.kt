@@ -25,6 +25,7 @@ class Prefs private constructor(context: Context) {
         private const val KEY_SEND_GROUP_MESSAGE_MMS = "send_group_message_mms"
         private const val KEY_USE_LIBRARY_SMS_SENDING = "use_library_sms_sending"
         private const val KEY_LOCK_SCREEN_PRIVACY = "lock_screen_privacy"
+        private const val KEY_SILENT_UNKNOWN_SENDERS = "silent_unknown_senders"
         private const val KEY_RECYCLE_BIN_ENABLED = "recycle_bin_enabled"
         private const val KEY_MUTED_THREADS       = "muted_threads"
         private const val KEY_PINNED_THREADS      = "pinned_threads"
@@ -40,6 +41,7 @@ class Prefs private constructor(context: Context) {
 
         const val PRIVACY_FULL        = "full"
         const val PRIVACY_SENDER_ONLY = "sender_only"
+        const val PRIVACY_NONE        = "none"
         const val THEME_SYSTEM        = "system"
         const val THEME_LIGHT         = "light"
         const val THEME_DARK          = "dark"
@@ -114,6 +116,11 @@ class Prefs private constructor(context: Context) {
     var lockScreenPrivacy: String
         get() = prefs.getString(KEY_LOCK_SCREEN_PRIVACY, PRIVACY_SENDER_ONLY) ?: PRIVACY_SENDER_ONLY
         set(v) = prefs.edit().putString(KEY_LOCK_SCREEN_PRIVACY, v).apply()
+
+    /** Suppress heads-up/ringtone for senders not resolved to a contact. */
+    var silentUnknownSenders: Boolean
+        get() = prefs.getBoolean(KEY_SILENT_UNKNOWN_SENDERS, false)
+        set(v) = prefs.edit().putBoolean(KEY_SILENT_UNKNOWN_SENDERS, v).apply()
 
     /** Move deleted messages to the recycle bin instead of hard-deleting. Default: false. */
     var recycleBinEnabled: Boolean

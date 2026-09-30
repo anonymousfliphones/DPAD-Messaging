@@ -72,12 +72,22 @@ class App : Application() {
                 description = "Notifications when a message fails to send"
             }
             manager.createNotificationChannel(failureChannel)
+
+            val backupChannel = NotificationChannel(
+                CHANNEL_BACKUP,
+                "Backup and restore",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Durable app-local backup and restore progress"
+            }
+            manager.createNotificationChannel(backupChannel)
         }
     }
 
     companion object {
         const val CHANNEL_MESSAGES = "dpad_messages_incoming"
         const val CHANNEL_SEND_FAILURE = "dpad_messages_send_failure"
+        const val CHANNEL_BACKUP = "dpad_backup_restore"
 
         @Volatile
         private var instance: App? = null

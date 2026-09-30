@@ -4,7 +4,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.app.Notification
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import com.dpad.messaging.App
 import com.dpad.messaging.R
@@ -15,7 +17,7 @@ import com.dpad.messaging.receivers.MarkAsReadReceiver
 /**
  * Builds and posts notifications for incoming messages.
  *
- * One notification per thread (keyed by threadId.toInt()).
+ * One notification per thread with a stable, positive integer identifier.
  * Each notification has:
  *   • Tap           → opens ThreadActivity
  *   • Reply action  → DirectReplyReceiver (inline reply via RemoteInput)
@@ -25,6 +27,17 @@ object NotificationHelper {
 
     const val REPLY_KEY = "reply_key"
     const val EXTRA_PHONE_NUMBER = "extra_phone_number"
+    private const val FAILURE_NOTIFICATION_OFFSET = 1_000_000_000
+
+    fun threadNotificationId(threadId: Long): Int {
+        val mixed = threadId xor (threadId ushr 32)
+        return (mixed.toInt() and 0x7FFFFFFF).coerceAtLeast(1)
+    }
+
+    fun failureNotificationId(messageId: Long): Int {
+        val mixed = messageId xor (messageId ushr 32)
+        return FAILURE_NOTIFICATION_OFFSET + (mixed.toInt() and 0x3FFFFFFF)
+    }
 
     fun showIncomingNotification(
         context: Context,
@@ -35,7 +48,7 @@ object NotificationHelper {
     ) {
         if (Prefs.get().isThreadMuted(threadId)) return
 
-        val notifId = threadId.toInt()
+        val notifId = threadNotificationId(threadId)
 
         // ── Tap → ThreadActivity ──────────────────────────────────────────────
         val openPI = PendingIntent.getActivity(
@@ -94,34 +107,57 @@ object NotificationHelper {
 
         // ── Build & post ──────────────────────────────────────────────────────
         val accentColor = ThemeManager.accentColor(context)
+        val sender = Person.Builder().setName(senderName).build()
+        val messageStyle = NotificationCompat.MessagingStyle(sender)
+            .addMessage(body, System.currentTimeMillis(), sender)
         val builder = NotificationCompat.Builder(context, App.CHANNEL_MESSAGES)
             .setSmallIcon(R.drawable.ic_new_message)
             .setColor(accentColor)
             .setColorized(true)
             .setContentTitle(senderName)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setStyle(messageStyle)
             .setContentIntent(openPI)
             .setAutoCancel(true)
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setSilent(
+                Prefs.get().silentUnknownSenders &&
+                    (senderName.isBlank() || senderName.trim() == phoneNumber.trim())
+            )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .addAction(replyAction)
             .addAction(markReadAction)
 
         // Apply lock screen privacy setting.
-        if (Prefs.get().lockScreenPrivacy == Prefs.PRIVACY_SENDER_ONLY) {
-            // Show only sender on lock screen; body is hidden.
-            val publicNotif = NotificationCompat.Builder(context, App.CHANNEL_MESSAGES)
-                .setSmallIcon(R.drawable.ic_new_message)
-                .setColor(accentColor)
-                .setColorized(true)
-                .setContentTitle(senderName)
-                .setContentText(context.getString(R.string.new_message))
-                .build()
-            builder
-                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setPublicVersion(publicNotif)
-        } else {
-            builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        when (Prefs.get().lockScreenPrivacy) {
+            Prefs.PRIVACY_SENDER_ONLY -> {
+                // Show only sender on lock screen; body is hidden.
+                val publicNotif = NotificationCompat.Builder(context, App.CHANNEL_MESSAGES)
+                    .setSmallIcon(R.drawable.ic_new_message)
+                    .setColor(accentColor)
+                    .setColorized(true)
+                    .setContentTitle(senderName)
+                    .setContentText(context.getString(R.string.new_message))
+                    .build()
+                builder
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setPublicVersion(publicNotif)
+            }
+            Prefs.PRIVACY_NONE -> {
+                val publicNotif = NotificationCompat.Builder(context, App.CHANNEL_MESSAGES)
+                    .setSmallIcon(R.drawable.ic_new_message)
+                    .setColor(accentColor)
+                    .setColorized(true)
+                    .setContentTitle(context.getString(R.string.app_name))
+                    .setContentText(context.getString(R.string.new_message))
+                    .build()
+                builder
+                    .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                    .setPublicVersion(publicNotif)
+            }
+            else -> {
+                builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            }
         }
 
         context.getSystemService(NotificationManager::class.java)
@@ -130,5 +166,65 @@ object NotificationHelper {
 
     fun cancelNotification(context: Context, notifId: Int) {
         context.getSystemService(NotificationManager::class.java).cancel(notifId)
+    }
+
+    fun cancelFailureNotification(context: Context, messageId: Long) {
+        cancelNotification(context, failureNotificationId(messageId))
+    }
+
+    fun showSendFailureNotification(
+        context: Context,
+        messageId: Long,
+        threadId: Long,
+        phoneNumber: String,
+        reason: String
+    ) {
+        if (messageId <= 0L || threadId <= 0L) return
+
+        val failureId = failureNotificationId(messageId)
+        val openIntent = Intent(context, ThreadActivity::class.java).apply {
+            putExtra(ThreadActivity.EXTRA_THREAD_ID, threadId)
+            putExtra(ThreadActivity.EXTRA_PHONE_NUMBER, phoneNumber)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val openPendingIntent = PendingIntent.getActivity(
+            context,
+            failureId,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val retryIntent = Intent(context, ThreadActivity::class.java).apply {
+            putExtra(ThreadActivity.EXTRA_THREAD_ID, threadId)
+            putExtra(ThreadActivity.EXTRA_PHONE_NUMBER, phoneNumber)
+            putExtra(ThreadActivity.EXTRA_RETRY_MESSAGE_ID, messageId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val retryPendingIntent = PendingIntent.getActivity(
+            context,
+            failureId + 1,
+            retryIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val accentColor = ThemeManager.accentColor(context)
+        val builder = NotificationCompat.Builder(context, App.CHANNEL_SEND_FAILURE)
+            .setSmallIcon(R.drawable.ic_new_message)
+            .setColor(accentColor)
+            .setContentTitle(context.getString(R.string.message_failed))
+            .setContentText(reason)
+            .setContentIntent(openPendingIntent)
+            .setAutoCancel(false)
+            .setCategory(Notification.CATEGORY_ERROR)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .addAction(0, context.getString(R.string.retry_send), retryPendingIntent)
+
+        context.getSystemService(NotificationManager::class.java)
+            .notify(failureId, builder.build())
     }
 }

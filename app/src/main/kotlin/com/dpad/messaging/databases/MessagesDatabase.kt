@@ -19,7 +19,7 @@ import com.dpad.messaging.models.*
         BlockedKeyword::class,
         BlockedNumber::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class MessagesDatabase : RoomDatabase() {
@@ -94,6 +94,13 @@ abstract class MessagesDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE drafts ADD COLUMN attachment_uris_json TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("ALTER TABLE drafts ADD COLUMN subscription_id INTEGER NOT NULL DEFAULT -1")
+            }
+        }
+
         @Volatile
         private var instance: MessagesDatabase? = null
 
@@ -113,6 +120,7 @@ abstract class MessagesDatabase : RoomDatabase() {
                 .addMigrations(MIGRATION_2_3)
                 .addMigrations(MIGRATION_3_4)
                 .addMigrations(MIGRATION_4_5)
+                .addMigrations(MIGRATION_5_6)
                 .build()
         }
     }

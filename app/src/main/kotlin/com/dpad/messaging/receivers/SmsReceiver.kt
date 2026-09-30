@@ -14,6 +14,7 @@ import com.dpad.messaging.events.RefreshMessages
 import com.dpad.messaging.helpers.SmsWhitelistManager
 import com.dpad.messaging.helpers.AppCoroutineScopes
 import com.dpad.messaging.helpers.NotificationHelper
+import com.dpad.messaging.helpers.PhoneNumberMatcher
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
 
@@ -160,11 +161,8 @@ class SmsReceiver : BroadcastReceiver() {
         // ── Local soft-filter (upstream blocklist + keywords) — suppress notification only ──
         val keywords = App.get().database.blockedKeywordsDao().getAll()
         val blockedNumbers = App.get().database.blockedNumbersDao().getAll()
-        val normalizedAddrDigits = address.filter { it.isDigit() }
-
         val isBlockedByNumber = blockedNumbers.any { bn ->
-            val ndigits = bn.number.filter { it.isDigit() }
-            bn.number == address || ndigits == normalizedAddrDigits
+            PhoneNumberMatcher.equivalent(bn.number, address)
         }
         val isBlockedByKeyword = keywords.any { kw ->
             body.contains(kw.keyword, ignoreCase = true)

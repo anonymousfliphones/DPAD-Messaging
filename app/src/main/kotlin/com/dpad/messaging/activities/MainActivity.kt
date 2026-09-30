@@ -67,6 +67,7 @@ class MainActivity : BaseActivity() {
     private var pendingFocusThreadId: Long? = null
     private var hasLoadedConversationsOnce = false
     private var conversationLoadError = false
+    private val selectedThreadIds = linkedSetOf<Long>()
 
     private val requiredPermissions = buildList {
         add(Manifest.permission.READ_SMS)
@@ -143,10 +144,14 @@ class MainActivity : BaseActivity() {
 
     private fun setupConversationList() {
         conversationsAdapter = ConversationsAdapter(
-            onConversationClick = { conversation -> openThread(conversation) },
-            onConversationLongClick = { conversation -> showConversationContextMenu(conversation) },
+            onConversationClick = { conversation ->
+                if (selectedThreadIds.isNotEmpty()) toggleSelection(conversation)
+                else openThread(conversation)
+            },
+            onConversationLongClick = { conversation -> toggleSelection(conversation) },
             onConversationMenuClick = { _, conversation -> showConversationContextMenu(conversation) },
-            onAvatarLongClick = { conversation -> showContactColorPicker(conversation) }
+            onAvatarLongClick = { conversation -> showContactColorPicker(conversation) },
+            isConversationSelected = { selectedThreadIds.contains(it) }
         )
 
         binding.rvConversations.apply {
@@ -166,6 +171,9 @@ class MainActivity : BaseActivity() {
         binding.btnSearch.setOnClickListener { showSearch() }
         binding.btnOverflow.setOnClickListener { showOverflowMenu() }
         binding.btnRetryConversations.setOnClickListener { loadConversations(forceRefresh = true) }
+        binding.btnSelectionClear.setOnClickListener { clearSelection() }
+        binding.btnSelectionArchive.setOnClickListener { archiveSelected() }
+        binding.btnSelectionRead.setOnClickListener { markSelectedRead() }
 
         // D-Pad DOWN from any toolbar button → focus first conversation
         val enterList = View.OnKeyListener { _, keyCode, event ->
@@ -302,7 +310,9 @@ class MainActivity : BaseActivity() {
     private fun displayConversations(conversations: List<Conversation>) {
         conversationLoadError = false
         binding.conversationError.visibility = View.GONE
+        selectedThreadIds.retainAll(conversations.mapTo(HashSet()) { it.threadId })
         conversationsAdapter.submitList(conversations) {
+            binding.tvEmpty.setText(R.string.no_conversations)
             binding.tvEmpty.visibility = if (conversations.isEmpty()) View.VISIBLE else View.GONE
 
             if (isSearchVisible) {
@@ -368,6 +378,9 @@ class MainActivity : BaseActivity() {
                 }
             }
             conversationsAdapter.submitList(filtered)
+            binding.tvEmpty.setText(
+                if (filtered.isEmpty()) R.string.no_search_results else R.string.no_conversations
+            )
             binding.tvEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
         }
     }
@@ -608,6 +621,7 @@ class MainActivity : BaseActivity() {
     // ─── Search overlay ─────────────────────────────────────────────────────
 
     private fun showSearch() {
+        clearSelection()
         binding.toolbar.visibility = View.GONE
         binding.searchBar.visibility = View.VISIBLE
         binding.etSearch.requestFocus()
@@ -631,6 +645,7 @@ class MainActivity : BaseActivity() {
 
             val popup = PopupMenu(ThemeManager.popupMenuContext(this), anchor ?: binding.rvConversations)
         popup.menu.apply {
+            add(0, 8, -1, getString(R.string.select_conversation))
             add(0, 1, 0, if (conversation.read) getString(R.string.mark_as_unread) else getString(R.string.mark_as_read))
             add(0, 2, 1, if (conversation.pinned) getString(R.string.unpin) else getString(R.string.pin))
             add(0, 3, 2, if (conversation.archived) getString(R.string.unarchive) else getString(R.string.archive))
@@ -642,6 +657,7 @@ class MainActivity : BaseActivity() {
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                8 -> toggleSelection(conversation)
                 1 -> toggleReadState(conversation)
                 2 -> togglePin(conversation)
                 3 -> toggleArchive(conversation)
@@ -654,6 +670,48 @@ class MainActivity : BaseActivity() {
         }
 
         popup.show()
+    }
+
+    private fun toggleSelection(conversation: Conversation) {
+        if (!selectedThreadIds.add(conversation.threadId)) {
+            selectedThreadIds.remove(conversation.threadId)
+        }
+        updateSelectionUi()
+        conversationsAdapter.notifyDataSetChanged()
+    }
+
+    private fun clearSelection() {
+        if (selectedThreadIds.isEmpty()) return
+        selectedThreadIds.clear()
+        updateSelectionUi()
+        conversationsAdapter.notifyDataSetChanged()
+    }
+
+    private fun updateSelectionUi() {
+        val selecting = selectedThreadIds.isNotEmpty()
+        binding.toolbar.visibility = if (selecting) View.GONE else View.VISIBLE
+        binding.selectionToolbar.visibility = if (selecting) View.VISIBLE else View.GONE
+        binding.tvSelectionCount.text = getString(R.string.selection_count, selectedThreadIds.size)
+    }
+
+    private fun archiveSelected() {
+        selectedThreadIds.forEach { Prefs.get().setThreadArchived(it, true) }
+        clearSelection()
+        loadConversations()
+    }
+
+    private fun markSelectedRead() {
+        val ids = selectedThreadIds.toList()
+        clearSelection()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val database = App.get().database
+            ids.forEach { threadId ->
+                database.conversationsDao().markAsRead(threadId)
+                database.messagesDao().markThreadRead(threadId)
+                markThreadAsReadInTelephony(threadId)
+            }
+            withContext(Dispatchers.Main) { loadConversations(forceRefresh = true) }
+        }
     }
 
     private fun showOverflowMenu() {

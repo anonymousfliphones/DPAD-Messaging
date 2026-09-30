@@ -4,8 +4,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.RemoteInput
+import com.dpad.messaging.App
 import com.dpad.messaging.events.RefreshConversations
 import com.dpad.messaging.events.RefreshMessages
+import com.dpad.messaging.extensions.markThreadAsReadInTelephony
 import com.dpad.messaging.helpers.AppCoroutineScopes
 import com.dpad.messaging.helpers.MessageSenders
 import com.dpad.messaging.helpers.NotificationHelper
@@ -44,6 +46,9 @@ class DirectReplyReceiver : BroadcastReceiver() {
                     threadId = threadId
                 )
                 sendSucceeded = true
+                App.get().database.messagesDao().markThreadRead(threadId)
+                App.get().database.conversationsDao().markAsRead(threadId)
+                context.markThreadAsReadInTelephony(threadId)
                 EventBus.getDefault().post(RefreshMessages(threadId))
                 EventBus.getDefault().post(RefreshConversations())
             } finally {
