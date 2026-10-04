@@ -318,6 +318,16 @@ class ThreadActivity : BaseActivity() {
         } else {
             threadTitle
         }
+        if (groupParticipants.size <= 1 && phoneNumber.isNotBlank()) {
+            lifecycleScope.launch {
+                val contactName = withContext(Dispatchers.IO) {
+                    App.get().contactHelper.resolve(phoneNumber)?.displayName
+                }
+                if (!contactName.isNullOrBlank() && threadTitle == phoneNumber) {
+                    binding.tvContactName.text = contactName
+                }
+            }
+        }
         if (groupParticipants.size > 1) {
             lifecycleScope.launch {
                 val title = withContext(Dispatchers.IO) {

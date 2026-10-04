@@ -1,0 +1,3 @@
+- Fix: Prevent conversation action menus from crashing on DumberOS and other devices
+- Fix: Resolve contact names more reliably for synced contacts
+- Improve: Refresh contact names after contacts sync

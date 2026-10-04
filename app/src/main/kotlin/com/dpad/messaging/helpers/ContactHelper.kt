@@ -18,7 +18,6 @@ class ContactHelper(private val context: Context) {
     )
 
     private val cache = LruCache<String, ContactInfo>(256)
-    private val misses = LruCache<String, Boolean>(256)
 
     /** Returns the best display name for a phone number, or the number itself if no contact found. */
     fun getDisplayName(phoneNumber: String): String {
@@ -32,35 +31,50 @@ class ContactHelper(private val context: Context) {
         val cacheKey = phoneNumber.filter { it.isDigit() }.ifBlank { phoneNumber }
         val cached = cache.get(cacheKey)
         if (cached != null) return cached
-        if (misses.get(cacheKey) == true) return null
-
-        val uri = Uri.withAppendedPath(
-            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-            Uri.encode(cacheKey)
-        )
         val projection = arrayOf(
             ContactsContract.PhoneLookup.DISPLAY_NAME,
             ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
         )
 
-        val result = try {
-            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val name = cursor.getString(0) ?: return@use null
-                    val photo = cursor.getString(1) ?: ""
-                    ContactInfo(name, photo).also { cache.put(cacheKey, it) }
-                } else null
-            }
-        } catch (e: Exception) {
-            null
+        // Keep the original number first: some Contacts providers use the
+        // leading '+' when matching synced E.164 numbers. The digit-only
+        // form remains a fallback for providers that normalize numbers.
+        val lookupNumbers = listOf(phoneNumber.trim(), cacheKey).distinct()
+        val result = lookupNumbers.firstNotNullOfOrNull { number ->
+            queryPhoneLookup(number, projection) ?: queryPhoneFilter(number, projection)
         }
-        if (result == null) misses.put(cacheKey, true)
+        if (result != null) cache.put(cacheKey, result)
         return result
+    }
+
+    private fun queryPhoneLookup(number: String, projection: Array<String>): ContactInfo? {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(number)
+        )
+        return queryContactInfo(uri, projection)
+    }
+
+    private fun queryPhoneFilter(number: String, projection: Array<String>): ContactInfo? {
+        val uri = Uri.withAppendedPath(
+            Phone.CONTENT_FILTER_URI,
+            Uri.encode(number)
+        )
+        return queryContactInfo(uri, projection)
+    }
+
+    private fun queryContactInfo(uri: Uri, projection: Array<String>): ContactInfo? = try {
+        context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val name = cursor.getString(0) ?: return@use null
+            ContactInfo(name, cursor.getString(1) ?: "")
+        }
+    } catch (_: Exception) {
+        null
     }
 
     fun clearCache() {
         cache.evictAll()
-        misses.evictAll()
     }
 
     data class ContactSuggestion(

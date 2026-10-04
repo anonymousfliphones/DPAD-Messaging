@@ -125,6 +125,9 @@ class MainActivity : BaseActivity() {
         super.onResume()
         EventBus.getDefault().register(this)
         applyAccent()
+        // DavX5 may complete a contacts sync while the app is not visible.
+        // Do not keep stale successful or failed name lookups across resumes.
+        App.get().contactHelper.clearCache()
         refreshConversationList()
         checkDefaultSmsApp()
     }
@@ -625,14 +628,14 @@ class MainActivity : BaseActivity() {
 
             val popup = PopupMenu(ThemeManager.popupMenuContext(this), anchor ?: binding.rvConversations)
         popup.menu.apply {
-            add(0, 8, -1, getString(R.string.select_conversation))
-            add(0, 1, 0, if (conversation.read) getString(R.string.mark_as_unread) else getString(R.string.mark_as_read))
-            add(0, 2, 1, if (conversation.pinned) getString(R.string.unpin) else getString(R.string.pin))
-            add(0, 3, 2, if (conversation.archived) getString(R.string.unarchive) else getString(R.string.archive))
-            add(0, 4, 3, if (Prefs.get().isThreadMuted(conversation.threadId)) getString(R.string.unmute_conversation) else getString(R.string.mute_conversation))
-            add(0, 5, 4, getString(R.string.copy_number))
-            add(0, 6, 5, getString(R.string.move_to_recycle_bin))
-            add(0, 7, 6, getString(R.string.conversation_details))
+            add(0, 8, 0, getString(R.string.select_conversation))
+            add(0, 1, 1, if (conversation.read) getString(R.string.mark_as_unread) else getString(R.string.mark_as_read))
+            add(0, 2, 2, if (conversation.pinned) getString(R.string.unpin) else getString(R.string.pin))
+            add(0, 3, 3, if (conversation.archived) getString(R.string.unarchive) else getString(R.string.archive))
+            add(0, 4, 4, if (Prefs.get().isThreadMuted(conversation.threadId)) getString(R.string.unmute_conversation) else getString(R.string.mute_conversation))
+            add(0, 5, 5, getString(R.string.copy_number))
+            add(0, 6, 6, getString(R.string.move_to_recycle_bin))
+            add(0, 7, 7, getString(R.string.conversation_details))
         }
 
         popup.setOnMenuItemClickListener { item ->
