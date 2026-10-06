@@ -443,8 +443,9 @@ suspend fun Context.getMessagesForThread(
         e.printStackTrace()
     }
 
-    // Sort all (SMS + MMS + local queued) by date ascending for chat display
-    return messages.sortedBy { it.date }
+    // Sort by time, then provider row ID. Some devices store timestamps with
+    // only minute-level precision, so date alone can reverse two messages.
+    return messages.sortedWith(compareBy<Message> { it.date }.thenBy { it.id })
 }
 
 /** Get the FROM or TO address for an MMS message. */

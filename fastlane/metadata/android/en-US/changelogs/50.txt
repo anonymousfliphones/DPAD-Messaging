@@ -1,0 +1,3 @@
+- Click phone numbers in messages to call, send a message, or add the number to contacts.
+- Open web links in messages with the default browser.
+- Keep messages in the correct order when they have the same timestamp.
