@@ -9,12 +9,14 @@
         <item name="colorOnSecondary">@color/colorOnSecondary</item>
         <item name="colorControlActivated">@color/colorSecondary</item>
         <item name="colorControlHighlight">@color/focus_highlight</item>
-        <item name="android:colorBackground">@color/colorBackground</item>
-        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:colorBackground">@color/surface_background</item>
+        <item name="android:windowBackground">@color/surface_background</item>
         <item name="android:statusBarColor">@color/toolbarBg</item>
-        <item name="android:navigationBarColor">@color/colorBackground</item>
-        <item name="android:textColor">@color/colorOnBackground</item>
-        <item name="android:textColorPrimary">@color/colorOnBackground</item>
+        <item name="android:navigationBarColor">@color/surface_background</item>
+        <item name="android:windowLightStatusBar">@bool/window_light_status_bar</item>
+        <item name="android:windowLightNavigationBar">@bool/window_light_navigation_bar</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="sentMessageBubbleColor">@color/bubbleSentBg</item>
         <item name="sentMessageBubbleFocusedColor">@color/bubbleSentBgFocused</item>
         <!-- Disable activity transition animations for snappy dumbphone feel -->
@@ -63,16 +65,16 @@
 
     <!-- Splash screen: identical background so there's no flash -->
     <style name="Theme.DpadMessaging.Splash" parent="Theme.DpadMessaging">
-        <item name="android:windowBackground">@color/colorBackground</item>
+        <item name="android:windowBackground">@color/surface_background</item>
     </style>
 
     <!-- ─── Popup Menu (context menus, overflow) ─── -->
     <style name="ThemeOverlay.DpadMessaging.PopupMenu" parent="ThemeOverlay.MaterialComponents">
-        <item name="colorSurface">@color/colorSurface</item>
-        <item name="colorOnSurface">@color/colorOnBackground</item>
-        <item name="android:popupBackground">@color/colorSurface</item>
-        <item name="android:textColorPrimary">@color/colorOnBackground</item>
-        <item name="android:textColorSecondary">@color/conversationDate</item>
+        <item name="colorSurface">@color/surface_elevated</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:popupBackground">@color/surface_elevated</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_tertiary</item>
     </style>
 
     <!-- ─── AlertDialog ─── -->

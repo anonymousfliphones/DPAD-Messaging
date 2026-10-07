@@ -27,59 +27,74 @@
     <color name="accent_orange_focused">#F39C3D</color>
     <color name="accent_rose_focused">#E1608E</color>
 
-    <!-- ─── Surface / Background ─── -->
-    <color name="colorBackground">#F4F6FA</color>
-    <color name="colorSurface">#FFFFFF</color>
-    <color name="colorOnBackground">#1B1F24</color>
-    <color name="colorOnSurface">#1B1F24</color>
+    <!-- ─── Semantic visual tokens ─── -->
+    <color name="surface_background">#F4F6FA</color>
+    <color name="surface_base">#FFFFFF</color>
+    <color name="surface_elevated">#FFFFFF</color>
+    <color name="text_primary">#1B1F24</color>
+    <color name="text_secondary">#596274</color>
+    <color name="text_tertiary">#7A8395</color>
+    <color name="divider_subtle">#D7DDE8</color>
+    <color name="focus_fill">#7A03DAC5</color>
+    <color name="focus_outline">#00FFFF</color>
+    <color name="status_success">#03A892</color>
+    <color name="status_error">#CF6679</color>
+    <color name="surface_compose">@color/surface_base</color>
+    <color name="surface_compose_input">#E8EEF4</color>
+
+    <!-- ─── Surface / Background aliases ─── -->
+    <color name="colorBackground">@color/surface_background</color>
+    <color name="colorSurface">@color/surface_base</color>
+    <color name="colorOnBackground">@color/text_primary</color>
+    <color name="colorOnSurface">@color/text_primary</color>
 
     <!-- ─── D-Pad Focus ─── (from DPAD Browser, adapted for messaging)
          Same teal/cyan language across all dpad-targeted apps.
          Light theme uses darker, more opaque highlight for better contrast. -->
-    <color name="focus_highlight">#7A03DAC5</color>   <!-- 48% opacity teal fill for light backgrounds -->
-    <color name="focus_border">#00FFFF</color>          <!-- bright cyan border -->
-    <color name="focus_border_sent">#00FFFF</color>     <!-- bright cyan for sent bubbles (improved contrast) -->
+    <color name="focus_highlight">@color/focus_fill</color>
+    <color name="focus_border">@color/focus_outline</color>
+    <color name="focus_border_sent">@color/focus_outline</color>
 
     <!-- ─── Message Bubbles ─── -->
     <color name="bubbleSentBg">#1A73E8</color>
     <color name="bubbleSentBgFocused">#42A5F5</color>
     <color name="bubbleSentText">#FFFFFF</color>
-    <color name="bubbleReceivedBg">#E7ECF4</color>
+    <color name="bubbleReceivedBg">#E8EDF1</color>
     <color name="bubbleReceivedText">#1B1F24</color>
 
     <!-- ─── Conversation List ─── -->
-    <color name="conversationTitle">#1B1F24</color>
-    <color name="conversationSnippet">#596274</color>
-    <color name="conversationDate">#7A8395</color>
+    <color name="conversationTitle">@color/text_primary</color>
+    <color name="conversationSnippet">@color/text_secondary</color>
+    <color name="conversationDate">@color/text_tertiary</color>
     <color name="unreadBadgeText">#FFFFFF</color>
-    <color name="divider">#D7DDE8</color>
+    <color name="divider">@color/divider_subtle</color>
 
     <!-- ─── Toolbar ─── -->
-    <color name="toolbarBg">#FFFFFF</color>
-    <color name="toolbarText">#1B1F24</color>
-    <color name="toolbarIcon">#3A4250</color>
+    <color name="toolbarBg">@color/surface_base</color>
+    <color name="toolbarText">@color/text_primary</color>
+    <color name="toolbarIcon">@color/text_secondary</color>
 
     <!-- ─── Date header ─── -->
-    <color name="dateHeaderText">#888888</color>
+    <color name="dateHeaderText">@color/text_tertiary</color>
 
     <!-- ─── Input / Compose ─── -->
-    <color name="composeBg">#FFFFFF</color>
-    <color name="composeInputBg">#EEF2F8</color>
+    <color name="composeBg">@color/surface_compose</color>
+    <color name="composeInputBg">@color/surface_compose_input</color>
     <color name="composeInputText">#1B1F24</color>
-    <color name="composeHint">#7B8597</color>
+    <color name="composeHint">@color/text_tertiary</color>
     <color name="sendButtonDisabled">#9AA3B2</color>
 
     <!-- ─── Status ─── -->
-    <color name="statusDelivered">#03DAC5</color>
-    <color name="statusFailed">#CF6679</color>
+    <color name="statusDelivered">@color/status_success</color>
+    <color name="statusFailed">@color/status_error</color>
 
     <!-- ─── Controls / Meta text ─── -->
     <color name="switchThumbOff">#AAAAAA</color>
     <color name="switchTrackOff">#666666</color>
     <color name="messageMetaOnSent">#AAFFFFFF</color>
-    <color name="messageMetaOnReceived">#7A8395</color>
+    <color name="messageMetaOnReceived">@color/text_tertiary</color>
     <color name="imageViewerBg">#000000</color>
 
     <!-- ─── Empty state ─── -->
-    <color name="emptyText">#7A8395</color>
+    <color name="emptyText">@color/text_tertiary</color>
 </resources>

@@ -98,16 +98,18 @@
                 android:ellipsize="end"
                 android:focusable="false"
                 android:maxLines="1"
+                android:includeFontPadding="false"
                 android:textColor="@color/conversationTitle"
-                android:textSize="@dimen/text_size_normal" />
+                android:textSize="@dimen/text_size_body_emphasis" />
 
             <TextView
                 android:id="@+id/tv_date"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:focusable="false"
+                android:includeFontPadding="false"
                 android:textColor="@color/conversationDate"
-                android:textSize="@dimen/text_size_small" />
+                android:textSize="@dimen/text_size_meta" />
 
         </LinearLayout>
 

@@ -461,6 +461,7 @@ class SettingsActivity : BaseActivity() {
     private fun sectionHeader(container: LinearLayout, text: String) {
         val tv = TextView(this).apply {
             this.text = text.uppercase()
+            includeFontPadding = false
             setTextColor(ThemeManager.accentColor(this@SettingsActivity))
             setTextSize(
                 android.util.TypedValue.COMPLEX_UNIT_PX,
@@ -528,6 +529,7 @@ class SettingsActivity : BaseActivity() {
         val accent = ThemeManager.accentColor(this)
         val tvValue = TextView(this).apply {
             text = labelFor(getValue(), optionValues, optionLabels)
+            includeFontPadding = false
             setTextColor(accent)
             setTextSize(
                 android.util.TypedValue.COMPLEX_UNIT_PX,
@@ -572,6 +574,7 @@ class SettingsActivity : BaseActivity() {
     ) {
         val tvChevron = TextView(this).apply {
             text = "›"
+            includeFontPadding = false
             setTextColor(accentStateTextColors())
             setTextSize(
                 android.util.TypedValue.COMPLEX_UNIT_PX,
@@ -600,7 +603,8 @@ class SettingsActivity : BaseActivity() {
     private fun buildTextColumn(label: String, summary: String): LinearLayout {
         val tvLabel = TextView(this).apply {
             text = label
-            setTextColor(accentStateTextColors())
+            includeFontPadding = false
+            setTextColor(stateTextColors(R.color.text_primary))
             setTextSize(
                 android.util.TypedValue.COMPLEX_UNIT_PX,
                 resources.getDimension(R.dimen.text_size_normal)
@@ -608,7 +612,8 @@ class SettingsActivity : BaseActivity() {
         }
         val tvSummary = TextView(this).apply {
             text = summary
-            setTextColor(accentStateTextColors())
+            includeFontPadding = false
+            setTextColor(stateTextColors(R.color.text_secondary))
             setTextSize(
                 android.util.TypedValue.COMPLEX_UNIT_PX,
                 resources.getDimension(R.dimen.text_size_small)
@@ -649,6 +654,13 @@ class SettingsActivity : BaseActivity() {
         return ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
             intArrayOf(accent, getColor(R.color.colorOnBackground))
+        )
+    }
+
+    private fun stateTextColors(defaultColor: Int): ColorStateList {
+        return ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
+            intArrayOf(ThemeManager.accentColor(this), getColor(defaultColor))
         )
     }
 

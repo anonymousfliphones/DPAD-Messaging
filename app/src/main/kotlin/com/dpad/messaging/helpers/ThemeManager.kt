@@ -32,11 +32,9 @@ object ThemeManager {
     }
 
     fun applyAccentColor(activity: Activity) {
-        val accentColor = accentColor(activity)
-
         activity.window.apply {
-            statusBarColor = accentColor
-            navigationBarColor = accentColor
+            statusBarColor = ContextCompat.getColor(activity, R.color.toolbarBg)
+            navigationBarColor = ContextCompat.getColor(activity, R.color.surface_background)
         }
 
         activity.findViewById<View>(android.R.id.content)?.apply {
