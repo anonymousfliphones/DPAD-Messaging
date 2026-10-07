@@ -1,2 +1,2 @@
-- Phone numbers and web links in messages can now be focused and opened with the D-pad.
-- Phone links offer actions to call, send a message, or add the number to contacts.
+- Use the D-pad to select phone numbers and web links in your messages.
+- Choose whether to call a number, text it, or save it to your contacts.
