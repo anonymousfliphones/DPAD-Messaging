@@ -11,6 +11,7 @@ Grab the signed APK for the latest release from the [Releases page](https://gith
 - SMS/MMS send and receive
 - Group messaging with fan-out or group MMS
 - D-pad optimized navigation
+- D-pad focus and activation for phone numbers and web links in messages
 - Dark/light theme with customizable accent colors
 - Per-contact colors for avatars and message bubbles
 - Pin, archive, mute, and delete conversations

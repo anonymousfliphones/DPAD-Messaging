@@ -1,0 +1,2 @@
+- Phone numbers and web links in messages can now be focused and opened with the D-pad.
+- Phone links offer actions to call, send a message, or add the number to contacts.
