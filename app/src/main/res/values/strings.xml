@@ -86,6 +86,7 @@
     <string name="contact_color_current">Current color: %1$s</string>
     <string name="contact_color_automatic">Automatic</string>
     <string name="contact_color_option">Contact color: %1$s</string>
+    <string name="contact_color_option_selected">Contact color: %1$s, selected</string>
     <string name="appearance">Appearance</string>
     <string name="conversation_actions">Conversation</string>
     <string name="danger_zone">Danger zone</string>

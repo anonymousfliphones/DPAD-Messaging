@@ -8,6 +8,7 @@ import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.ColorUtils
@@ -204,27 +205,44 @@ object ContactColors {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             val density = parent.context.resources.displayMetrics.density
             val swatchSizePx = (density * 48f).toInt()
-            val view = View(parent.context).apply {
+            val check = TextView(parent.context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                text = "✓"
+                textSize = 22f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                isClickable = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            val view = FrameLayout(parent.context).apply {
                 layoutParams = ViewGroup.LayoutParams(swatchSizePx, swatchSizePx)
                 isFocusable = true
                 isFocusableInTouchMode = true
+                addView(check)
             }
-            return ViewHolder(view)
+            return ViewHolder(view, check)
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val color = colors[position]
+            val displayColor = color ?: 0xFF607D8B.toInt()
+            val selected = color == selectedColor
             holder.itemView.apply {
-                isSelected = color == selectedColor
-                background = if (color != null) {
-                    swatchDrawable(color, isSelected)
-                } else {
-                    swatchDrawable(0xFF607D8B.toInt(), isSelected)
-                }
+                isSelected = selected
+                background = swatchDrawable(displayColor, selected)
                 contentDescription = context.getString(
-                    R.string.contact_color_option,
+                    if (selected) R.string.contact_color_option_selected
+                    else R.string.contact_color_option,
                     ContactColors.colorName(color)
                 )
+                holder.check.apply {
+                    visibility = if (selected) View.VISIBLE else View.GONE
+                    setTextColor(textColorOn(displayColor))
+                }
                 setOnClickListener {
                     selectedColor = color
                     notifyDataSetChanged()
@@ -237,7 +255,7 @@ object ContactColors {
 
         override fun getItemCount() = colors.size
 
-        class ViewHolder(view: View) : RecyclerView.ViewHolder(view)
+        class ViewHolder(view: FrameLayout, val check: TextView) : RecyclerView.ViewHolder(view)
     }
 
     private class SwatchItemDecoration(private val spacingPx: Int) :
