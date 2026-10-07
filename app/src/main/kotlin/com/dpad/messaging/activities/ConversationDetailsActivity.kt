@@ -96,7 +96,7 @@ class ConversationDetailsActivity : BaseActivity() {
         val focusedTextColors = ColorStateList(
             arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
             intArrayOf(
-                ContextCompat.getColor(this, R.color.colorOnPrimary),
+                ContextCompat.getColor(this, R.color.colorOnBackground),
                 ContextCompat.getColor(this, R.color.colorOnBackground)
             )
         )
@@ -173,7 +173,7 @@ class ConversationDetailsActivity : BaseActivity() {
                     imageTintList = ColorStateList(
                         arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
                         intArrayOf(
-                            ContextCompat.getColor(this@ConversationDetailsActivity, R.color.colorOnPrimary),
+                            ContextCompat.getColor(this@ConversationDetailsActivity, R.color.colorOnBackground),
                             accent
                         )
                     )
@@ -263,7 +263,7 @@ class ConversationDetailsActivity : BaseActivity() {
             ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
                 intArrayOf(
-                    ContextCompat.getColor(this, R.color.colorOnPrimary),
+                    ContextCompat.getColor(this, R.color.colorOnBackground),
                     ContextCompat.getColor(this, R.color.colorOnBackground)
                 )
             )
@@ -272,18 +272,18 @@ class ConversationDetailsActivity : BaseActivity() {
             ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
                 intArrayOf(
-                    ContextCompat.getColor(this, R.color.colorOnPrimary),
+                    ContextCompat.getColor(this, R.color.colorOnBackground),
                     ContextCompat.getColor(this, R.color.statusFailed)
                 )
             )
         )
 
-        val onPrimary = ContextCompat.getColor(this, R.color.colorOnPrimary)
+        val focusedForeground = ContextCompat.getColor(this, R.color.colorOnBackground)
         participantNameViews.forEach { nameView ->
             nameView.setTextColor(
                 ColorStateList(
                     arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
-                    intArrayOf(onPrimary, ContextCompat.getColor(this, R.color.colorOnBackground))
+                    intArrayOf(focusedForeground, ContextCompat.getColor(this, R.color.colorOnBackground))
                 )
             )
         }
@@ -291,14 +291,14 @@ class ConversationDetailsActivity : BaseActivity() {
             addView.setTextColor(
                 ColorStateList(
                     arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
-                    intArrayOf(onPrimary, accent)
+                    intArrayOf(focusedForeground, accent)
                 )
             )
         }
         participantCallViews.forEach { callView ->
             callView.imageTintList = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
-                intArrayOf(onPrimary, accent)
+                intArrayOf(focusedForeground, accent)
             )
         }
     }

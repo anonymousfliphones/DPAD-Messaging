@@ -129,7 +129,7 @@ object ContactColors {
     /**
      * Shows a D-Pad-friendly color picker.
      * [currentColor] selects the matching swatch when the dialog opens;
-     * [onSelected] receives the chosen color, or null to clear back to default.
+     * [onSelected] receives the saved color, or null to clear back to default.
      */
     fun showColorPicker(
         context: Context,
@@ -146,9 +146,10 @@ object ContactColors {
         val widthDp = context.resources.displayMetrics.widthPixels / density
         val columns = if (widthDp < 280f) 3 else 4
 
+        val pickerAdapter = ColorPickerAdapter(colors, currentColor)
         val recycler = RecyclerView(context).apply {
             layoutManager = GridLayoutManager(context, columns)
-            adapter = ColorPickerAdapter(colors, currentColor, onSelected)
+            adapter = pickerAdapter
             setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
             addItemDecoration(SwatchItemDecoration(spacingPx))
             // Limit max height to fit on small screens (Sonim XP3900: 320dp height)
@@ -164,6 +165,7 @@ object ContactColors {
         val dialog = AlertDialog.Builder(context)
             .setTitle(title)
             .setView(recycler)
+            .setPositiveButton(R.string.save) { _, _ -> onSelected(pickerAdapter.selectedColor) }
             .setNegativeButton(android.R.string.cancel, null)
             .create()
 
@@ -193,9 +195,11 @@ object ContactColors {
 
     private class ColorPickerAdapter(
         private val colors: List<Int?>,
-        private val currentColor: Int?,
-        private val onSelected: (Int?) -> Unit
+        currentColor: Int?
     ) : RecyclerView.Adapter<ColorPickerAdapter.ViewHolder>() {
+
+        var selectedColor: Int? = currentColor
+            private set
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
             val density = parent.context.resources.displayMetrics.density
@@ -211,7 +215,7 @@ object ContactColors {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val color = colors[position]
             holder.itemView.apply {
-                isSelected = color == currentColor
+                isSelected = color == selectedColor
                 background = if (color != null) {
                     swatchDrawable(color, isSelected)
                 } else {
@@ -222,9 +226,10 @@ object ContactColors {
                     ContactColors.colorName(color)
                 )
                 setOnClickListener {
-                    onSelected(color)
+                    selectedColor = color
+                    notifyDataSetChanged()
                 }
-                if (color == currentColor) {
+                if (color == selectedColor) {
                     requestFocus()
                 }
             }
