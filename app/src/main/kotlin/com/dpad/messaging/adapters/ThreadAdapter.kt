@@ -168,6 +168,8 @@ class ThreadAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message, position: Int) {
             binding.tvBody.text = message.body
+            binding.bubbleContainer.isFocusable = !binding.tvBody.isFocusable
+            binding.bubbleContainer.isFocusableInTouchMode = !binding.tvBody.isFocusableInTouchMode
             binding.tvBody.scrollTo(0, 0)
             binding.tvBody.visibility = if (message.body.isBlank()) View.GONE else View.VISIBLE
             binding.tvTime.text = formatTime(message.date)
@@ -194,6 +196,8 @@ class ThreadAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message, position: Int) {
             binding.tvBody.text = message.body
+            binding.bubbleContainer.isFocusable = !binding.tvBody.isFocusable
+            binding.bubbleContainer.isFocusableInTouchMode = !binding.tvBody.isFocusableInTouchMode
             binding.tvBody.scrollTo(0, 0)
             binding.tvBody.visibility = if (message.body.isBlank()) View.GONE else View.VISIBLE
             binding.tvTime.text = formatTime(message.date)
@@ -260,6 +264,8 @@ class ThreadAdapter(
                 else -> ""
             }
             binding.tvBody.text = bodyText
+            binding.bubbleContainer.isFocusable = !binding.tvBody.isFocusable
+            binding.bubbleContainer.isFocusableInTouchMode = !binding.tvBody.isFocusableInTouchMode
             binding.tvBody.scrollTo(0, 0)
             binding.tvBody.visibility = if (bodyText.isBlank()) View.GONE else View.VISIBLE
             if (message.isScheduled) {
@@ -563,6 +569,8 @@ class ThreadAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message, @Suppress("UNUSED_PARAMETER") position: Int) {
             binding.tvBody.text = message.body
+            binding.bubbleContainer.isFocusable = !binding.tvBody.isFocusable
+            binding.bubbleContainer.isFocusableInTouchMode = !binding.tvBody.isFocusableInTouchMode
             binding.tvBody.scrollTo(0, 0)
             binding.tvBody.visibility = if (message.body.isBlank()) View.GONE else View.VISIBLE
             binding.bubbleContainer.setOnLongClickListener {

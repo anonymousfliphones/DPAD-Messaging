@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import android.text.Spannable
+import android.text.Selection
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.URLSpan
@@ -34,6 +35,7 @@ class MessageBodyTextView @JvmOverloads constructor(
         overScrollMode = OVER_SCROLL_IF_CONTENT_SCROLLS
         linksClickable = true
         movementMethod = LinkMovementMethod.getInstance()
+        highlightColor = context.getColor(R.color.focus_highlight)
     }
 
     override fun setText(text: CharSequence?, type: BufferType?) {
@@ -48,7 +50,42 @@ class MessageBodyTextView @JvmOverloads constructor(
         }
     }
 
+    override fun onFocusChanged(focused: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
+        super.onFocusChanged(focused, direction, previouslyFocusedRect)
+        val spannable = text as? Spannable ?: return
+        val links = spannable.getSpans(0, spannable.length, android.text.style.ClickableSpan::class.java)
+        if (focused) {
+            links.firstOrNull()?.let { link ->
+                Selection.setSelection(spannable, spannable.getSpanStart(link), spannable.getSpanEnd(link))
+            }
+        } else {
+            Selection.removeSelection(spannable)
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+            keyCode == android.view.KeyEvent.KEYCODE_ENTER
+        ) {
+            val spannable = text as? Spannable
+            val selectionStart = spannable?.let { Selection.getSelectionStart(it) } ?: -1
+            val link = spannable
+                ?.getSpans(0, spannable.length, android.text.style.ClickableSpan::class.java)
+                ?.firstOrNull { selectionStart in spannable.getSpanStart(it)..spannable.getSpanEnd(it) }
+                ?: spannable?.getSpans(
+                    0, spannable.length, android.text.style.ClickableSpan::class.java
+                )?.firstOrNull()
+            if (link != null) {
+                link.onClick(this)
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     private fun replacePhoneLinks() {
+        isFocusable = false
+        isFocusableInTouchMode = false
         val text = text as? Spannable ?: return
         text.getSpans(0, text.length, URLSpan::class.java).forEach { span ->
             if (!span.url.startsWith("tel:", ignoreCase = true)) return@forEach
@@ -67,6 +104,9 @@ class MessageBodyTextView @JvmOverloads constructor(
                 }
             }, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
+        val hasLinks = text.getSpans(0, text.length, android.text.style.ClickableSpan::class.java).isNotEmpty()
+        isFocusable = hasLinks
+        isFocusableInTouchMode = hasLinks
     }
 
     private fun showPhoneActions(number: String) {
