@@ -62,6 +62,13 @@ class ConversationDetailsActivity : BaseActivity() {
             ?: emptyList()
 
         binding.tvContactName.text = currentTitle
+        binding.tvIdentitySummary.text = getString(
+            R.string.participant_count,
+            if (participants.isNotEmpty()) participants.size else if (phoneNumber.isNotBlank()) 1 else 0
+        )
+        binding.tvIdentityAvatar.text = (currentTitle.firstOrNull { !it.isWhitespace() }
+            ?: phoneNumber.firstOrNull { it.isDigit() }
+            ?: '?').uppercaseChar().toString()
         populateParticipants(participants, phoneNumber)
 
         binding.btnBack.setOnClickListener { finish() }
@@ -76,6 +83,7 @@ class ConversationDetailsActivity : BaseActivity() {
 
         colorTargetNumber = participants.firstOrNull() ?: phoneNumber
         updateColorSwatch()
+        binding.btnBack.post { binding.btnBack.requestFocus() }
     }
 
     private fun populateParticipants(participants: List<String>, phoneNumber: String) {
@@ -106,9 +114,8 @@ class ConversationDetailsActivity : BaseActivity() {
             return
         }
 
-        val lastIndex = numbers.size - 1
-        var prevTvId: Int? = null
-        numbers.forEachIndexed { index, num ->
+        val participantFocusViews = mutableListOf<Pair<View, View>>()
+        numbers.forEach { num ->
             val info = App.get().contactHelper.resolve(num)
             val display = info?.displayName ?: num
 
@@ -121,7 +128,7 @@ class ConversationDetailsActivity : BaseActivity() {
                 ).apply {
                     bottomMargin = resources.getDimensionPixelSize(R.dimen.padding_tiny)
                 }
-                setBackgroundResource(R.drawable.details_row_bg)
+                setBackgroundResource(R.drawable.button_focusable_bg)
                 // Let children receive focus first (so the name and + button are individually reachable)
                 descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
                 isFocusable = false
@@ -161,7 +168,7 @@ class ConversationDetailsActivity : BaseActivity() {
                         resources.getDimensionPixelSize(R.dimen.compose_button_size),
                         LinearLayout.LayoutParams.MATCH_PARENT
                     )
-                    setBackgroundResource(R.drawable.details_row_bg)
+                    setBackgroundResource(R.drawable.button_focusable_bg)
                     setImageResource(R.drawable.ic_call)
                     imageTintList = ColorStateList(
                         arrayOf(intArrayOf(android.R.attr.state_focused), intArrayOf()),
@@ -182,12 +189,12 @@ class ConversationDetailsActivity : BaseActivity() {
                 participantCallViews.add(callButton)
                 tv.nextFocusRightId = callId
                 callButton.nextFocusLeftId = tvId
+                participantFocusViews.add(tv to callButton)
             }
 
-            var addId = -1
             if (info == null) {
                 // Unknown number — show Add Contact control
-                addId = View.generateViewId()
+                val addId = View.generateViewId()
                 val add = TextView(this).apply {
                     id = addId
                     layoutParams = LinearLayout.LayoutParams(
@@ -211,16 +218,9 @@ class ConversationDetailsActivity : BaseActivity() {
                 }
                 row.addView(add)
                 participantAddViews.add(add)
-                // horizontal navigation between name and add button
                 tv.nextFocusRightId = addId
                 add.nextFocusLeftId = tvId
-                // vertical chaining for add button will mirror the tv below
-                if (prevTvId != null) {
-                    val pid = prevTvId!!
-                    findViewById<TextView>(pid).let { prevTv ->
-                        add.nextFocusUpId = prevTv.nextFocusUpId
-                    }
-                }
+                participantFocusViews.add(tv to add)
             }
 
             // Accessibility on name
@@ -231,31 +231,20 @@ class ConversationDetailsActivity : BaseActivity() {
             }
 
             container.addView(row)
-
-            // Vertical chaining between tvs
-            if (prevTvId == null) {
-                binding.btnBack.nextFocusDownId = tvId
-                tv.nextFocusUpId = binding.btnBack.id
-            } else {
-                val prevId = prevTvId!!
-                val prevTv = findViewById<TextView>(prevId)
-                prevTv.nextFocusDownId = tvId
-                tv.nextFocusUpId = prevId
-                // mirror for add button if present
-                if (addId != -1) {
-                    findViewById<TextView>(prevId).nextFocusDownId = tvId
-                }
-            }
-
-            if (index == lastIndex) {
-                tv.nextFocusDownId = binding.rowColor.id
-                binding.rowColor.nextFocusUpId = tvId
-                binding.rowColor.nextFocusDownId = binding.btnRename.id
-                binding.btnRename.nextFocusUpId = binding.rowColor.id
-            }
-
-            prevTvId = tvId
         }
+
+        participantFocusViews.forEachIndexed { index, (nameView, actionView) ->
+            val previous = participantFocusViews.getOrNull(index - 1)
+            val next = participantFocusViews.getOrNull(index + 1)
+            nameView.nextFocusUpId = previous?.first?.id ?: binding.btnBack.id
+            actionView.nextFocusUpId = previous?.second?.id ?: binding.btnBack.id
+            nameView.nextFocusDownId = next?.first?.id ?: binding.rowColor.id
+            actionView.nextFocusDownId = next?.second?.id ?: binding.rowColor.id
+        }
+        binding.btnBack.nextFocusDownId = participantFocusViews.first().first.id
+        binding.rowColor.nextFocusUpId = participantFocusViews.last().first.id
+        binding.rowColor.nextFocusDownId = binding.btnRename.id
+        binding.btnRename.nextFocusUpId = binding.rowColor.id
 
         applyAccent()
     }
@@ -320,19 +309,29 @@ class ConversationDetailsActivity : BaseActivity() {
         ContactColors.showColorPicker(
             context = this,
             title = getString(R.string.choose_contact_color),
-            currentColor = current
-        ) { selected ->
+            currentColor = current,
+            onSelected = { selected ->
             if (selected != current) {
                 Prefs.get().setContactColor(ContactColors.normalize(colorTargetNumber), selected)
                 updateColorSwatch()
             }
-        }
+            },
+            onDismiss = {
+            binding.rowColor.requestFocus()
+            }
+        )
     }
 
     private fun updateColorSwatch() {
         if (colorTargetNumber.isBlank()) return
-        binding.colorSwatch.background.setTint(
-            ContactColors.resolveColor(colorTargetNumber)
+        val custom = ContactColors.customColor(colorTargetNumber)
+        val resolved = ContactColors.resolveColor(colorTargetNumber)
+        binding.colorSwatch.background.setTint(resolved)
+        binding.tvIdentityAvatar.background.setTint(resolved)
+        binding.tvIdentityAvatar.setTextColor(ContactColors.textColorOn(resolved))
+        binding.tvColorValue.text = getString(
+            R.string.contact_color_current,
+            ContactColors.colorName(custom)
         )
     }
 
@@ -343,7 +342,7 @@ class ConversationDetailsActivity : BaseActivity() {
             setTextColor(getColor(R.color.colorOnBackground))
             setBackgroundResource(R.drawable.compose_input_bg)
         }
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle(R.string.rename_conversation)
             .setView(input)
             .setPositiveButton(R.string.save) { _, _ ->
@@ -361,7 +360,9 @@ class ConversationDetailsActivity : BaseActivity() {
                 }
             }
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+        dialog.setOnShowListener { input.requestFocus() }
+        dialog.show()
     }
 
     private fun showBlockConfirmation(phoneNumber: String) {

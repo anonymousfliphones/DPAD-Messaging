@@ -56,21 +56,64 @@
             android:orientation="vertical"
             android:padding="@dimen/padding_medium">
 
-            <!-- Contact name row -->
-            <TextView
-                android:id="@+id/tv_contact_name"
+            <!-- Contact identity -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="@dimen/padding_small"
-                android:textColor="@color/conversationTitle"
-                android:textSize="@dimen/text_size_large"
-                android:textStyle="bold" />
+                android:layout_marginBottom="@dimen/padding_medium"
+                android:background="@color/surface_base"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="@dimen/padding_medium">
+
+                <TextView
+                    android:id="@+id/tv_identity_avatar"
+                    android:layout_width="@dimen/avatar_size"
+                    android:layout_height="@dimen/avatar_size"
+                    android:background="@drawable/avatar_bg"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/colorOnPrimary"
+                    android:textSize="@dimen/avatar_text_size"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/padding_medium"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_contact_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:textColor="@color/conversationTitle"
+                        android:textSize="@dimen/text_size_body_emphasis"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_identity_summary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/padding_tiny"
+                        android:includeFontPadding="false"
+                        android:textColor="@color/conversationSnippet"
+                        android:textSize="@dimen/text_size_meta" />
+
+                </LinearLayout>
+
+            </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/padding_tiny"
                 android:layout_marginBottom="@dimen/padding_small"
+                android:includeFontPadding="false"
                 android:text="@string/participants"
                 android:textColor="@color/conversationDate"
                 android:textSize="@dimen/text_size_small"
@@ -85,6 +128,17 @@
                 android:paddingBottom="@dimen/padding_medium" />
 
             <!-- Action: Set contact color -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/padding_small"
+                android:paddingTop="@dimen/padding_small"
+                android:paddingBottom="@dimen/padding_small"
+                android:text="@string/appearance"
+                android:textColor="@color/colorSecondary"
+                android:textSize="@dimen/text_size_meta"
+                android:textStyle="bold" />
+
             <LinearLayout
                 android:id="@+id/row_color"
                 android:layout_width="match_parent"
@@ -116,9 +170,29 @@
                     android:textColor="@color/conversationSnippet"
                     android:textSize="@dimen/text_size_normal" />
 
+                <TextView
+                    android:id="@+id/tv_color_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/padding_small"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/conversationDate"
+                    android:textSize="@dimen/text_size_meta" />
+
             </LinearLayout>
 
             <!-- Action: Rename conversation -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/padding_small"
+                android:paddingTop="@dimen/padding_large"
+                android:paddingBottom="@dimen/padding_small"
+                android:text="@string/conversation_actions"
+                android:textColor="@color/colorSecondary"
+                android:textSize="@dimen/text_size_meta"
+                android:textStyle="bold" />
+
             <TextView
                 android:id="@+id/btn_rename"
                 android:layout_width="match_parent"
@@ -131,9 +205,21 @@
                 android:paddingEnd="@dimen/padding_medium"
                 android:text="@string/rename_conversation"
                 android:textColor="@color/colorOnBackground"
-                android:textSize="@dimen/text_size_normal" />
+                android:includeFontPadding="false"
+                android:textSize="@dimen/text_size_body" />
 
             <!-- Action: Block -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="@dimen/padding_small"
+                android:paddingTop="@dimen/padding_large"
+                android:paddingBottom="@dimen/padding_small"
+                android:text="@string/danger_zone"
+                android:textColor="@color/statusFailed"
+                android:textSize="@dimen/text_size_meta"
+                android:textStyle="bold" />
+
             <TextView
                 android:id="@+id/btn_block"
                 android:layout_width="match_parent"
@@ -147,7 +233,8 @@
                 android:paddingEnd="@dimen/padding_medium"
                 android:text="@string/block"
                 android:textColor="@color/statusFailed"
-                android:textSize="@dimen/text_size_normal" />
+                android:includeFontPadding="false"
+                android:textSize="@dimen/text_size_body" />
 
         </LinearLayout>
 

@@ -40,7 +40,10 @@ object ContactColors {
         0xFF6D4C41.toInt()  // Brown
     )
 
-    private const val COLUMNS = 4
+    private val PALETTE_NAMES = arrayOf(
+        "Red", "Pink", "Purple", "Deep purple", "Indigo", "Blue",
+        "Cyan", "Teal", "Green", "Light green", "Orange", "Brown"
+    )
 
     /** Digits-only form used as the storage key. */
     fun normalize(phoneNumber: String): String =
@@ -49,6 +52,12 @@ object ContactColors {
     /** User-assigned color for [phoneNumber], or null if unset. */
     fun customColor(phoneNumber: String): Int? =
         Prefs.get().getContactColor(normalize(phoneNumber))
+
+    fun colorName(color: Int?): String {
+        if (color == null) return "Automatic"
+        val index = PALETTE.indexOf(color)
+        return PALETTE_NAMES.getOrElse(index) { "Custom" }
+    }
 
     /**
      * Best color for [phoneNumber] = custom color if set,
@@ -73,20 +82,27 @@ object ContactColors {
 
     // ── Drawables ───────────────────────────────────────────────────────────
 
-    private fun roundedRect(color: Int, radiusDp: Float, strokeWidth: Int): GradientDrawable =
+    private fun roundedRect(
+        color: Int,
+        radiusDp: Float,
+        strokeWidth: Int,
+        strokeColor: Int = 0xFF00FFFF.toInt()
+    ): GradientDrawable =
         GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(color)
             cornerRadius = radiusDp
-            if (strokeWidth > 0) setStroke(strokeWidth, 0xFF00FFFF.toInt())
+            if (strokeWidth > 0) setStroke(strokeWidth, strokeColor)
         }
 
-    /** Rounded-square swatch that shows the app's cyan focus ring when focused. */
-    fun swatchDrawable(color: Int): Drawable {
+    /** Rounded-square swatch with separate selected and D-pad-focused states. */
+    fun swatchDrawable(color: Int, selected: Boolean = false): Drawable {
         val normal = roundedRect(color, 8f, 0)
         val focused = roundedRect(color, 8f, 7)
+        val selectedState = roundedRect(color, 8f, 3, textColorOn(color))
         return StateListDrawable().apply {
             addState(intArrayOf(android.R.attr.state_focused), focused)
+            if (selected) addState(intArrayOf(android.R.attr.state_selected), selectedState)
             addState(IntArray(0), normal)
         }
     }
@@ -119,14 +135,16 @@ object ContactColors {
         context: Context,
         title: String,
         currentColor: Int?,
-        onSelected: (Int?) -> Unit
+        onSelected: (Int?) -> Unit,
+        onDismiss: (() -> Unit)? = null
     ) {
         val density = context.resources.displayMetrics.density
         val spacingPx = (density * 8f).toInt()
         val paddingPx = (density * 16f).toInt()
 
         val colors = PALETTE.toList() + null  // null represents "default"
-        val columns = 4
+        val widthDp = context.resources.displayMetrics.widthPixels / density
+        val columns = if (widthDp < 280f) 3 else 4
 
         val recycler = RecyclerView(context).apply {
             layoutManager = GridLayoutManager(context, columns)
@@ -139,7 +157,7 @@ object ContactColors {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).also { params ->
-                params.height = maxHeight.coerceAtMost(params.height)
+                params.height = maxHeight
             }
         }
 
@@ -152,7 +170,9 @@ object ContactColors {
         dialog.setOnShowListener {
             val target = currentColor?.let { PALETTE.indexOf(it) } ?: colors.size - 1
             recycler.layoutManager?.scrollToPosition(target)
-            recycler.getChildAt(0)?.requestFocus()
+            recycler.post {
+                recycler.findViewHolderForAdapterPosition(target)?.itemView?.requestFocus()
+            }
             // Ensure dialog fits on screen
             dialog.window?.apply {
                 setLayout(
@@ -166,6 +186,7 @@ object ContactColors {
                 }
             }
         }
+        dialog.setOnDismissListener { onDismiss?.invoke() }
 
         dialog.show()
     }
@@ -190,7 +211,16 @@ object ContactColors {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val color = colors[position]
             holder.itemView.apply {
-                background = if (color != null) swatchDrawable(color) else swatchDrawable(0xFF607D8B.toInt())
+                isSelected = color == currentColor
+                background = if (color != null) {
+                    swatchDrawable(color, isSelected)
+                } else {
+                    swatchDrawable(0xFF607D8B.toInt(), isSelected)
+                }
+                contentDescription = context.getString(
+                    R.string.contact_color_option,
+                    ContactColors.colorName(color)
+                )
                 setOnClickListener {
                     onSelected(color)
                 }

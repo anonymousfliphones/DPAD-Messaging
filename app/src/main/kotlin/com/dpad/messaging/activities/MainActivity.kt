@@ -411,13 +411,14 @@ class MainActivity : BaseActivity() {
         ContactColors.showColorPicker(
             context = this,
             title = conversation.title.ifBlank { number },
-            currentColor = current
-        ) { selected ->
+            currentColor = current,
+            onSelected = { selected ->
             if (selected != current) {
                 Prefs.get().setContactColor(ContactColors.normalize(number), selected)
                 conversationsAdapter.notifyDataSetChanged()
             }
-        }
+            }
+        )
     }
 
     private fun openThreadById(threadId: Long) {

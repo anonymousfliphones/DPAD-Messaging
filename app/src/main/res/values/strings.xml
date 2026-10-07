@@ -80,8 +80,15 @@
     <!-- ─── Conversation Details ─── -->
     <string name="conversation_details">Conversation Details</string>
     <string name="participants">Participants</string>
+    <string name="participant_count">%1$d participants</string>
     <string name="rename_conversation">Rename Conversation</string>
     <string name="contact_color">Contact Color</string>
+    <string name="contact_color_current">Current color: %1$s</string>
+    <string name="contact_color_automatic">Automatic</string>
+    <string name="contact_color_option">Contact color: %1$s</string>
+    <string name="appearance">Appearance</string>
+    <string name="conversation_actions">Conversation</string>
+    <string name="danger_zone">Danger zone</string>
     <string name="choose_contact_color">Choose a color</string>
     <string name="enter_recipients_hint">Add recipients with + or type a number</string>
     <string name="new_thread_hint">Type number and click center or use the + to add contacts</string>
