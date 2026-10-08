@@ -155,6 +155,17 @@
     <string name="character_counter_summary">Show SMS length and segment count</string>
     <string name="send_group_message_mms">Group Text via MMS</string>
     <string name="send_group_message_mms_summary">Keep text-only group replies in one thread. Turn off to send individual SMS instead.</string>
+    <string name="mms_ua_preset">MMS Device Identity</string>
+    <string name="mms_ua_preset_summary">Identity sent to carrier MMSC. Use Verizon or a Verizon device preset to receive voice notes as MP3.</string>
+    <string name="mms_ua_preset_system">Auto-detect (recommended)</string>
+    <string name="mms_ua_preset_verizon">Verizon (TCL Flip T408DL)</string>
+    <string name="mms_ua_preset_samsung">Samsung Galaxy S10 (Verizon)</string>
+    <string name="mms_ua_preset_iphone">iPhone</string>
+    <string name="mms_ua_preset_moto">Motorola G7 Power</string>
+    <string name="voice_note_format">Voice Note Format</string>
+    <string name="voice_note_format_summary">Codec used when recording voice notes</string>
+    <string name="voice_note_format_amr">AMR (most compatible)</string>
+    <string name="voice_note_format_aac">AAC (better quality)</string>
     <string name="lock_screen_privacy">Lock Screen Privacy</string>
     <string name="lock_screen_privacy_summary">Control what appears in lock screen notifications</string>
     <string name="show_sender_and_message">Show sender and message</string>

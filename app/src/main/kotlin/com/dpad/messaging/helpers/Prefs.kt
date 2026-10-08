@@ -38,6 +38,8 @@ class Prefs private constructor(context: Context) {
         private const val KEY_DEFAULT_SMS_DISMISSED = "default_sms_dismissed"
         private const val KEY_EXPERIMENTAL_UPDATES = "experimental_updates"
         private const val KEY_CONTACT_COLOR_PREFIX = "contact_color_"
+        private const val KEY_MMS_UA_PRESET       = "mms_ua_preset"
+        private const val KEY_VOICE_NOTE_FORMAT   = "voice_note_format"
 
         const val PRIVACY_FULL        = "full"
         const val PRIVACY_SENDER_ONLY = "sender_only"
@@ -57,6 +59,8 @@ class Prefs private constructor(context: Context) {
         const val UI_SCALE_NORMAL     = "normal"    // 1.0x  (default)
         const val UI_SCALE_LARGE      = "large"     // 1.25x
         const val UI_SCALE_XLARGE     = "xlarge"    // 1.5x
+        const val VOICE_FORMAT_AMR    = "amr"       // AMR-NB .amr (default)
+        const val VOICE_FORMAT_AAC    = "aac"       // AAC in MP4 .m4a
 
         private const val TAG = "Prefs"
 
@@ -116,6 +120,17 @@ class Prefs private constructor(context: Context) {
     var lockScreenPrivacy: String
         get() = prefs.getString(KEY_LOCK_SCREEN_PRIVACY, PRIVACY_SENDER_ONLY) ?: PRIVACY_SENDER_ONLY
         set(v) = prefs.edit().putString(KEY_LOCK_SCREEN_PRIVACY, v).apply()
+
+    /** One of the `MmsHttpOverrides.PRESET_*` values. Default: system (auto-detect Verizon). */
+    var mmsUaPreset: String
+        get() = prefs.getString(KEY_MMS_UA_PRESET, MmsHttpOverrides.PRESET_SYSTEM)
+            ?: MmsHttpOverrides.PRESET_SYSTEM
+        set(v) = prefs.edit().putString(KEY_MMS_UA_PRESET, v).apply()
+
+    /** Codec for recorded voice notes: [VOICE_FORMAT_AMR] or [VOICE_FORMAT_AAC]. Default: AMR. */
+    var voiceNoteFormat: String
+        get() = prefs.getString(KEY_VOICE_NOTE_FORMAT, VOICE_FORMAT_AMR) ?: VOICE_FORMAT_AMR
+        set(v) = prefs.edit().putString(KEY_VOICE_NOTE_FORMAT, v).apply()
 
     /** Suppress heads-up/ringtone for senders not resolved to a contact. */
     var silentUnknownSenders: Boolean

@@ -24,6 +24,7 @@ import com.dpad.messaging.R
 import com.dpad.messaging.databinding.ActivitySettingsBinding
 import com.dpad.messaging.helpers.BackupManager
 import com.dpad.messaging.helpers.BackupWorker
+import com.dpad.messaging.helpers.MmsHttpOverrides
 import com.dpad.messaging.helpers.Prefs
 import com.dpad.messaging.helpers.ThemeManager
 import com.dpad.messaging.helpers.UpdateManager
@@ -271,6 +272,41 @@ class SettingsActivity : BaseActivity() {
             summary   = getString(R.string.send_group_message_mms_summary),
             getValue  = { prefs.sendGroupMessageMms },
             setValue  = { prefs.sendGroupMessageMms = it }
+        )
+
+        valueRow(
+            container    = c,
+            label        = getString(R.string.mms_ua_preset),
+            summary      = getString(R.string.mms_ua_preset_summary),
+            getValue     = { prefs.mmsUaPreset },
+            optionValues = listOf(
+                MmsHttpOverrides.PRESET_SYSTEM,
+                MmsHttpOverrides.PRESET_VERIZON,
+                MmsHttpOverrides.PRESET_SAMSUNG,
+                MmsHttpOverrides.PRESET_IPHONE,
+                MmsHttpOverrides.PRESET_MOTO
+            ),
+            optionLabels = listOf(
+                getString(R.string.mms_ua_preset_system),
+                getString(R.string.mms_ua_preset_verizon),
+                getString(R.string.mms_ua_preset_samsung),
+                getString(R.string.mms_ua_preset_iphone),
+                getString(R.string.mms_ua_preset_moto)
+            ),
+            setValue     = { prefs.mmsUaPreset = it }
+        )
+
+        valueRow(
+            container    = c,
+            label        = getString(R.string.voice_note_format),
+            summary      = getString(R.string.voice_note_format_summary),
+            getValue     = { prefs.voiceNoteFormat },
+            optionValues = listOf(Prefs.VOICE_FORMAT_AMR, Prefs.VOICE_FORMAT_AAC),
+            optionLabels = listOf(
+                getString(R.string.voice_note_format_amr),
+                getString(R.string.voice_note_format_aac)
+            ),
+            setValue     = { prefs.voiceNoteFormat = it }
         )
 
         // ── Privacy ──────────────────────────────────────────────────────────

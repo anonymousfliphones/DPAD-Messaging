@@ -332,23 +332,21 @@ class ThreadAdapter(
         message: Message,
         bubbleContainer: View
     ) {
+        val rvAttachments = bubbleContainer.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_attachments)
         if (!message.isMms) {
-            bubbleContainer.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_attachments).apply {
-                visibility = View.GONE
-            }
+            rvAttachments.visibility = View.GONE
+            bubbleContainer.setOnClickListener(null)
             return
         }
 
         val attachments = MmsAttachmentJson.decode(message.attachmentsJson)
         if (attachments.isEmpty()) {
-            bubbleContainer.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_attachments).apply {
-                visibility = View.GONE
-            }
+            rvAttachments.visibility = View.GONE
+            bubbleContainer.setOnClickListener(null)
             return
         }
 
         val context = bubbleContainer.context
-        val rvAttachments = bubbleContainer.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.rv_attachments)
         if (rvAttachments.layoutManager == null) {
             rvAttachments.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(
                 context,
@@ -366,6 +364,14 @@ class ThreadAdapter(
             attachmentAdapter.submitAttachments(attachments)
         }
         rvAttachments.visibility = View.VISIBLE
+
+        // D-pad OK on the bubble container → click the single attachment tile (e.g. voice note).
+        // Multiple attachments: the user D-pads into the rv directly.
+        if (attachments.size == 1 && attachments[0].mimeType.startsWith("audio/")) {
+            bubbleContainer.setOnClickListener { rvAttachments.getChildAt(0)?.performClick() }
+        } else {
+            bubbleContainer.setOnClickListener(null)
+        }
     }
 
     private inner class AttachmentAdapter(

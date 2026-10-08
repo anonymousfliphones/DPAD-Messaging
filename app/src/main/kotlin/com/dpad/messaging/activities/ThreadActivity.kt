@@ -728,7 +728,12 @@ class ThreadActivity : BaseActivity() {
     private fun startVoiceRecording() {
         if (isRecordingVoiceMessage) return
 
-        val outputFile = File(filesDir, "voice_messages/thread_${threadId}_${System.currentTimeMillis()}.m4a")
+        // AMR-NB is what stock Android messaging records: every MMSC and feature phone
+        // accepts it, and a minute is ~90 KB. AAC/MP4 sounds better but some carrier
+        // gateways and dumbphones reject or mangle it.
+        val useAmr = Prefs.get().voiceNoteFormat == Prefs.VOICE_FORMAT_AMR
+        val extension = if (useAmr) "amr" else "m4a"
+        val outputFile = File(filesDir, "voice_messages/thread_${threadId}_${System.currentTimeMillis()}.$extension")
         outputFile.parentFile?.mkdirs()
 
         val mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -741,10 +746,17 @@ class ThreadActivity : BaseActivity() {
         try {
             mediaRecorder.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioEncodingBitRate(64_000)
-                setAudioSamplingRate(22_050)
+                if (useAmr) {
+                    setOutputFormat(MediaRecorder.OutputFormat.AMR_NB)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
+                    setAudioEncodingBitRate(12_200)
+                    setAudioSamplingRate(8_000)
+                } else {
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                    setAudioEncodingBitRate(64_000)
+                    setAudioSamplingRate(22_050)
+                }
                 setOutputFile(outputFile.absolutePath)
                 prepare()
                 start()
